@@ -10,12 +10,12 @@ import java.nio.file.Path;
  */
 public final class Csr {
     public static final Csr EMPTY = new Csr(OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY,
-            OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY);
+            OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY);
 
-    private final MemorySegment off, tgt, conf, clause, flags, masks, label, caseVal, site;
+    private final MemorySegment off, tgt, conf, clause, flags, masks, label, caseVal, site, derive;
 
     private Csr(MemorySegment off, MemorySegment tgt, MemorySegment conf, MemorySegment clause, MemorySegment flags,
-                MemorySegment masks, MemorySegment label, MemorySegment caseVal, MemorySegment site) {
+                MemorySegment masks, MemorySegment label, MemorySegment caseVal, MemorySegment site, MemorySegment derive) {
         this.off = off;
         this.tgt = tgt;
         this.conf = conf;
@@ -25,6 +25,7 @@ public final class Csr {
         this.label = label;
         this.caseVal = caseVal;
         this.site = site;
+        this.derive = derive;
     }
 
     public static Csr open(Path dir, String prefix, Arena arena) {
@@ -37,13 +38,14 @@ public final class Csr {
                 OffHeap.map(dir.resolve(prefix + ".masks"), arena),
                 OffHeap.map(dir.resolve(prefix + ".label"), arena),
                 OffHeap.map(dir.resolve(prefix + ".caseVal"), arena),
-                OffHeap.map(dir.resolve(prefix + ".site"), arena));
+                OffHeap.map(dir.resolve(prefix + ".site"), arena),
+                OffHeap.map(dir.resolve(prefix + ".derive"), arena));
     }
 
     /** 메모리 위의 세그먼트로 만든 CSR (L2 chunk용). */
     public static Csr of(MemorySegment off, MemorySegment tgt, MemorySegment conf, MemorySegment label,
                          MemorySegment caseVal) {
-        return new Csr(off, tgt, conf, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, label, caseVal, OffHeap.EMPTY);
+        return new Csr(off, tgt, conf, OffHeap.EMPTY, OffHeap.EMPTY, OffHeap.EMPTY, label, caseVal, OffHeap.EMPTY, OffHeap.EMPTY);
     }
 
     public boolean isEmpty() {
@@ -96,12 +98,17 @@ public final class Csr {
         return caseVal.byteSize() == 0 ? -1 : OffHeap.getInt(caseVal, i);
     }
 
+    /** COL_DERIVES의 DIRECT/EXPR/AGG (derive 파일이 없으면 0). */
+    public int derive(int i) {
+        return OffHeap.getU8(derive, i);
+    }
+
     public int site(int i) {
         return site.byteSize() == 0 ? -1 : OffHeap.getInt(site, i);
     }
 
     public long byteSize() {
         return off.byteSize() + tgt.byteSize() + conf.byteSize() + clause.byteSize() + flags.byteSize()
-                + masks.byteSize() + label.byteSize() + caseVal.byteSize() + site.byteSize();
+                + masks.byteSize() + label.byteSize() + caseVal.byteSize() + site.byteSize() + derive.byteSize();
     }
 }
