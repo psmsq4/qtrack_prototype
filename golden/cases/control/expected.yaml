@@ -1,0 +1,50 @@
+# 제어 의존 (FR-CF-02~06, [협의]): 조건 노드, 라벨이 붙은 CONTROL, CONTROL_FLOW와 --control
+tags: [static, control]
+queries:
+  # score는 조건으로만 grade를 결정 → 데이터 흐름만으로는 SQL에 닿지 않는다
+  - id: q2-score-data-only
+    kind: flow
+    args: [POST /grade, score]
+    expect: []
+
+  - id: q2-score-with-control
+    kind: flow
+    args: [POST /grade, score]
+    options: { control: true }
+    expect:
+      - "메서드|com.k.GradeController#update(java.lang.String,int)"
+      - "SQL|com.k.ScoreMapper#update"
+      - "SQL 바인드|com.k.ScoreMapper#update #{grade}"
+      - "컬럼|MEMBER.GRADE"
+
+  - id: q2-kind-with-control
+    kind: flow
+    args: [POST /level, kind]
+    options: { control: true }
+    expect:
+      - "메서드|com.k.GradeController#level(java.lang.String,int,boolean)"
+      - "SQL|com.k.ScoreMapper#update"
+      - "SQL 바인드|com.k.ScoreMapper#update #{grade}"
+      - "컬럼|MEMBER.GRADE"
+
+control:
+  # 가드 조기 반환 + else-if 체인 (else에는 조건 노드 없음)
+  - method: "com.k.GradeController#update(java.lang.String,int)"
+    edges:
+      - "id == null -FALSE-> score > 90"
+      - "score > 90 -TRUE-> grade#1"
+      - "score > 90 -FALSE-> score > 70"
+      - "score > 70 -TRUE-> grade#2"
+      - "score > 70 -FALSE-> grade#3"
+      - "id == null -FALSE-> update(·)[0]"
+      - "id == null -FALSE-> update(·)[1]"
+      - "id == null -FALSE-> update() 결과"
+      - "id == null -FALSE-> return@L22"
+  # switch fall-through + && 단락 평가 + 삼항
+  - method: "com.k.GradeController#level(java.lang.String,int,boolean)"
+    edges:
+      - "switch (kind) -CASE 1-> level#2"
+      - "switch (kind) -CASE 1-> level#4"
+      - "switch (kind) -CASE 2-> level#4"
+      - "switch (kind) -DEFAULT-> level#5"
+      - "flag -TRUE-> kind > 0"

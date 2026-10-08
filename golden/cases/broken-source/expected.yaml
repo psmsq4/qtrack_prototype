@@ -1,0 +1,14 @@
+# 깨진 소스: 오류 노드만 건너뛰고 나머지 메서드는 추출 (FR-IN-01)
+tags: [static, robustness]
+stats:
+  javaErrorNodes: ">=1"
+  javaMethods: 3
+queries:
+  - id: q2-text
+    kind: flow
+    args: [POST /notes, text]
+    expect:
+      - "메서드|com.b.BrokenController#save(java.lang.String)"
+      - "SQL|com.b.NoteMapper#insert"
+      - "SQL 바인드|com.b.NoteMapper#insert #{text}"
+      - "컬럼|NOTE.BODY"

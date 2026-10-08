@@ -1,0 +1,57 @@
+# 설계서 부록 A (기획서 s14~s18) 예제
+description: OrderController → OrderService.list → find → OrderMapper.select (MyBatis XML)
+tags: [static, appendix]
+queries:
+  - id: q1-cust-id
+    kind: column
+    args: [ORDERS.CUST_ID]
+    expect:
+      - "SQL|com.x.OrderMapper#select"
+      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+      - "메서드|com.x.OrderService#find(java.lang.String)"
+      - "메서드|com.x.OrderService#list(java.lang.String)"
+      - "메서드|com.x.OrderController#orders(java.lang.String)"
+      - "Endpoint|GET /api/orders"
+      - "Endpoint 입력|com.x.OrderController#orders(java.lang.String) (custId)"
+
+  - id: q1-cust-id-exact-only
+    kind: column
+    args: [ORDERS.CUST_ID]
+    options: { minConf: EXACT }
+    expect:
+      - "SQL|com.x.OrderMapper#select"
+      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+
+  # s18: --implicit 를 끄면 custId → list 반환 경로는 나오지 않고 #{id} → ORDERS.CUST_ID 경로는 나온다 (D-06)
+  - id: q2-custid
+    kind: flow
+    args: [GET /api/orders, custId]
+    expect:
+      - "메서드|com.x.OrderController#orders(java.lang.String)"
+      - "메서드|com.x.OrderService#list(java.lang.String)"
+      - "메서드|com.x.OrderService#find(java.lang.String)"
+      - "SQL|com.x.OrderMapper#select"
+      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+      - "컬럼|ORDERS.CUST_ID"
+
+  - id: q2-custid-implicit
+    kind: flow
+    args: [/api/orders, custId]
+    options: { implicit: true }
+    tags: [implicit]
+    expect:
+      - "메서드|com.x.OrderController#orders(java.lang.String)"
+      - "메서드|com.x.OrderService#list(java.lang.String)"
+      - "메서드|com.x.OrderService#find(java.lang.String)"
+      - "SQL|com.x.OrderMapper#select"
+      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+      - "컬럼|ORDERS.CUST_ID"
+      - "Endpoint|GET /api/orders"
+
+  - id: q3-find
+    kind: method
+    args: ["com.x.OrderService#find(java.lang.String)"]
+    expect:
+      - "직접 호출자|com.x.OrderService#list(java.lang.String)"
+      - "간접 호출자|com.x.OrderController#orders(java.lang.String)"
+      - "Endpoint|GET /api/orders"

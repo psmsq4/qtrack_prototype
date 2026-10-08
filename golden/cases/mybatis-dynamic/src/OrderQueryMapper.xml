@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.d.OrderQueryMapper">
+  <sql id="orderCols">o.ORDER_ID, o.AMOUNT</sql>
+
+  <!-- 동적 SQL <if>/<foreach>/<choose> + Oracle 힌트·(+) 조인 + ${} 치환 -->
+  <select id="search" resultType="com.d.OrderRow">
+    SELECT /*+ INDEX(o IX_ORD_CUST) */ <include refid="orderCols"/>, c.CUST_NAME
+      FROM ORDERS o, CUSTOMER c
+    <where>
+      o.CUST_ID = c.CUST_ID(+)
+      <if test="custId != null">AND o.CUST_ID = #{custId}</if>
+      <if test="status != null">AND o.STATUS = #{status}</if>
+      <if test="ids != null">
+        AND o.ORDER_ID IN
+        <foreach collection="ids" item="oid" open="(" separator="," close=")">#{oid}</foreach>
+      </if>
+    </where>
+    <choose>
+      <when test="sortColumn != null">ORDER BY ${sortColumn}</when>
+      <otherwise>ORDER BY o.ORDER_ID</otherwise>
+    </choose>
+  </select>
+
+  <!-- CONNECT BY 계층 질의 -->
+  <select id="tree" resultType="com.d.OrderRow">
+    SELECT LEVEL, CAT_ID, PARENT_ID FROM CATEGORY
+     START WITH CAT_ID = #{root}
+    CONNECT BY PRIOR CAT_ID = PARENT_ID
+  </select>
+
+  <!-- PIVOT -->
+  <select id="pivot" resultType="com.d.OrderRow">
+    SELECT * FROM (SELECT CUST_ID, STATUS, AMOUNT FROM ORDERS WHERE CUST_ID = #{custId})
+     PIVOT (SUM(AMOUNT) FOR STATUS IN ('A' AS A, 'C' AS C))
+  </select>
+
+  <!-- 전개 상한(64) 초과: 2^7 = 128 → <if> 모두 포함 1벌, HEURISTIC -->
+  <select id="huge" resultType="com.d.OrderRow">
+    SELECT ORDER_ID FROM ORDERS
+    <where>
+      <if test="a != null">AND COL_A = #{a}</if>
+      <if test="b != null">AND COL_B = #{b}</if>
+      <if test="c != null">AND COL_C = #{c}</if>
+      <if test="d != null">AND COL_D = #{d}</if>
+      <if test="e != null">AND COL_E = #{e}</if>
+      <if test="f != null">AND COL_F = #{f}</if>
+      <if test="g != null">AND COL_G = #{g}</if>
+    </where>
+  </select>
+</mapper>

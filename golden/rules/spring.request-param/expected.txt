@@ -1,0 +1,5 @@
+endpointParam a RequestParam @L3
+endpointParam bb RequestParam @L3
+endpointParam id PathVariable @L4
+endpointParam body RequestBody @L4
+endpointParam X-Token RequestHeader @L4

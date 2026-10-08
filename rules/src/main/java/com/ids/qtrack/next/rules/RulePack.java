@@ -117,10 +117,17 @@ public final class RulePack implements AutoCloseable {
         rules.sort(Comparator.comparingInt(Rule::phase));
     }
 
-    /** 특정 규칙만 남긴 팩 (규칙 단위 골든 테스트, VR-03). */
+    /** 특정 규칙과 클래스 수준(phase 0) 규칙만 남긴 팩 (규칙 단위 골든 테스트, VR-03). */
     public RulePack only(String ruleId) {
         RulePack p = new RulePack();
         for (Rule r : rules) if (r.id.equals(ruleId) || r.phase() == 0) p.rules.add(r);
+        return p;
+    }
+
+    /** only(ruleId)에서 그 규칙만 뺀 팩 (기준선). */
+    public RulePack baselineFor(String ruleId) {
+        RulePack p = new RulePack();
+        for (Rule r : rules) if (!r.id.equals(ruleId) && r.phase() == 0) p.rules.add(r);
         return p;
     }
 

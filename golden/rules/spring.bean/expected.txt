@@ -1,0 +1,3 @@
+bean orderServiceImpl @L2
+bean orderRepo @L4
+bean ctl @L6

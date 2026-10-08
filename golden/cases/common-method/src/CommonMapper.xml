@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.c.CommonMapper">
+  <select id="findA" resultType="string">SELECT A_NAME FROM TA WHERE A_KEY = #{key}</select>
+  <select id="findB" resultType="string">SELECT B_NAME FROM TB WHERE B_KEY = #{key}</select>
+</mapper>

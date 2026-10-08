@@ -164,7 +164,7 @@ public final class SqlMethodBuilder {
                     .setClause(Clause.forNumber(u.clause())).setImplicit(!flows));
         }
         // 결과행 → DTO 프로퍼티 (resultType / resultMap)
-        if (select && resultType != null && !resultType.isEmpty()) {
+        if (select && SqlMethodFactory.isDto(resultType)) {           // 별칭(string, map 등)은 제외
             for (SqlResult.Output o : r.outputs) {
                 String prop = resultProps.getOrDefault(o.name(), camel(o.name()));
                 if (o.name().equals("*")) continue;

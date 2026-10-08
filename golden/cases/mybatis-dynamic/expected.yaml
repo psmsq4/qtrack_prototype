@@ -1,0 +1,72 @@
+# 동적 SQL(<if>/<foreach>/<choose>/<include>), 전개 상한, ${} 치환, Oracle 구문(힌트, (+), CONNECT BY, PIVOT)
+tags: [dynamic, oracle]
+stats:
+  sqlVariantParseFailures: 0
+  sqlStatementsCapped: 1
+queries:
+  - id: q2-custid
+    kind: flow
+    args: [GET /orders/search, custId]
+    expect:
+      - "메서드|com.d.OrderQueryController#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
+      - "SQL|com.d.OrderQueryMapper#search"
+      - "SQL 바인드|com.d.OrderQueryMapper#search #{custId}"
+      - "컬럼|ORDERS.CUST_ID"
+
+  - id: q2-foreach-ids
+    kind: flow
+    args: [GET /orders/search, ids]
+    expect:
+      - "메서드|com.d.OrderQueryController#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
+      - "SQL|com.d.OrderQueryMapper#search"
+      - "SQL 바인드|com.d.OrderQueryMapper#search #{oid}"
+      - "컬럼|ORDERS.ORDER_ID"
+
+  # ${…}: 바인드가 아니라 SQL 텍스트 오염 → UNKNOWN (HEURISTIC)
+  - id: q2-dollar
+    kind: flow
+    args: [GET /orders/search, sortColumn]
+    tags: [unknown]
+    expect:
+      - "메서드|com.d.OrderQueryController#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
+      - "SQL|com.d.OrderQueryMapper#search"
+      - "UNKNOWN|com.d.OrderQueryMapper#search ${sortColumn}"
+      - "Endpoint|GET /orders/search"
+
+  - id: q1-connect-by
+    kind: column
+    args: [CATEGORY.CAT_ID]
+    tags: [oracle]
+    expect:
+      - "SQL|com.d.OrderQueryMapper#tree"
+      - "SQL 바인드|com.d.OrderQueryMapper#tree #{root}"
+      - "메서드|com.d.OrderQueryController#tree(java.lang.String)"
+      - "Endpoint 입력|com.d.OrderQueryController#tree(java.lang.String) (root)"
+      - "Endpoint|GET /orders/tree"
+
+  - id: q2-pivot
+    kind: flow
+    args: [GET /orders/pivot, custId]
+    tags: [oracle]
+    expect:
+      - "메서드|com.d.OrderQueryController#pivot(java.lang.String)"
+      - "SQL|com.d.OrderQueryMapper#pivot"
+      - "SQL 바인드|com.d.OrderQueryMapper#pivot #{custId}"
+      - "컬럼|ORDERS.CUST_ID"
+
+  # 전개 상한 초과: 신뢰도 HEURISTIC → minConf=RESOLVED 이면 바인드에서 멈춘다
+  - id: q2-capped-heuristic
+    kind: flow
+    args: [GET /orders/huge, a]
+    expect:
+      - "메서드|com.d.OrderQueryController#huge(java.lang.String,java.lang.String)"
+      - "SQL|com.d.OrderQueryMapper#huge"
+      - "SQL 바인드|com.d.OrderQueryMapper#huge #{a}"
+      - "컬럼|ORDERS.COL_A"
+  - id: q2-capped-min-resolved
+    kind: flow
+    args: [GET /orders/huge, a]
+    options: { minConf: RESOLVED }
+    expect:
+      - "메서드|com.d.OrderQueryController#huge(java.lang.String,java.lang.String)"
+      - "SQL|com.d.OrderQueryMapper#huge"

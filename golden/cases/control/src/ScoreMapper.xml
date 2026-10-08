@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.k.ScoreMapper">
+  <update id="update">UPDATE MEMBER SET GRADE = #{grade} WHERE MEMBER_ID = #{id}</update>
+</mapper>

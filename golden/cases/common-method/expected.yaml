@@ -1,0 +1,33 @@
+# 공통 메서드 다중 호출: 문맥 민감성 (FR-QR-04, VR-04)
+tags: [static, context]
+queries:
+  - id: q2-a-does-not-leak-to-b
+    kind: flow
+    args: [GET /a, x]
+    expect:
+      - "메서드|com.c.AController#a(java.lang.String)"
+      - "메서드|com.c.Util#normalize(java.lang.String)"
+      - "SQL|com.c.CommonMapper#findA"
+      - "SQL 바인드|com.c.CommonMapper#findA #{key}"
+      - "컬럼|TA.A_KEY"
+
+  - id: q2-b-does-not-leak-to-a
+    kind: flow
+    args: [GET /b, y]
+    expect:
+      - "메서드|com.c.BController#b(java.lang.String)"
+      - "메서드|com.c.Util#normalize(java.lang.String)"
+      - "SQL|com.c.CommonMapper#findB"
+      - "SQL 바인드|com.c.CommonMapper#findB #{key}"
+      - "컬럼|TB.B_KEY"
+
+  - id: q1-ta-only-reaches-a
+    kind: column
+    args: [TA.A_KEY]
+    expect:
+      - "SQL|com.c.CommonMapper#findA"
+      - "SQL 바인드|com.c.CommonMapper#findA #{key}"
+      - "메서드|com.c.AController#a(java.lang.String)"
+      - "메서드|com.c.Util#normalize(java.lang.String)"
+      - "Endpoint 입력|com.c.AController#a(java.lang.String) (x)"
+      - "Endpoint|GET /a"

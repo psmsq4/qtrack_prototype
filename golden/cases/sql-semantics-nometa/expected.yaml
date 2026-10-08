@@ -1,0 +1,41 @@
+# FR-SQ (카탈로그 없음): 같은 소스. 한정자 없는 컬럼은 후보 전부 HEURISTIC, 컬럼 목록 없는 INSERT는 TABLE.*
+tags: [static, sql-semantics, meta-required]
+src: ../sql-semantics/src
+queries:
+  - id: q2-unqualified-heuristic-candidates
+    kind: flow
+    args: [GET /grades, grade]
+    expect:
+      - "메서드|com.s.GradeController#byGrade(java.lang.String)"
+      - "SQL|com.s.GradeMapper#byGrade"
+      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
+      - "컬럼|CUSTOMER.CUST_GRADE"
+      - "컬럼|ORDERS.CUST_GRADE"
+
+  - id: q2-unqualified-min-resolved
+    kind: flow
+    args: [GET /grades, grade]
+    options: { minConf: RESOLVED }
+    expect:
+      - "메서드|com.s.GradeController#byGrade(java.lang.String)"
+      - "SQL|com.s.GradeMapper#byGrade"
+      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
+
+  - id: q1-amount-no-column-list
+    kind: column
+    args: [ORDERS.AMOUNT]
+    expect:
+      - "SQL|etl.sql#stmt1@L1"
+      - "SQL|etl.sql#stmt4@L14"
+      - "컬럼|ORDER_HIST.*"
+      - "컬럼|CUST_SUMMARY.TOTAL_AMT"
+
+  # 인라인 뷰 * 치환과 CTAS 재사용은 메타 없이도 동작
+  - id: q1-grade-ctas-without-meta
+    kind: column
+    args: [CUSTOMER.CUST_GRADE]
+    mode: contains
+    expect:
+      - "SQL|com.s.GradeMapper#byGradeView"
+      - "컬럼|VIP_CUST.GRADE"
+      - "컬럼|VIP_REPORT.GRADE"

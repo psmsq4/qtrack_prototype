@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.s.GradeMapper">
+  <!-- 한정자 없는 컬럼(CUST_NAME, CUST_GRADE): 카탈로그가 있으면 RESOLVED, 없으면 후보 전부 HEURISTIC (FR-SQ-02) -->
+  <select id="byGrade" resultType="string">
+    SELECT ORDER_ID, CUST_NAME
+      FROM ORDERS o JOIN CUSTOMER c ON o.CUST_ID = c.CUST_ID
+     WHERE CUST_GRADE = #{grade}
+  </select>
+
+  <!-- SELECT * FROM (인라인 뷰): 안쪽 프로젝션으로 치환 (메타 불필요, FR-SQ-03) -->
+  <select id="byGradeView" resultType="string">
+    SELECT * FROM (SELECT CUST_ID, CUST_GRADE FROM CUSTOMER) v WHERE v.CUST_GRADE = #{g}
+  </select>
+</mapper>

@@ -1,0 +1,1 @@
+classAttr pathPrefix=/api/v1 @L2

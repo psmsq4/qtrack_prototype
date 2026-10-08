@@ -1,0 +1,55 @@
+# 필드 경유 흐름(STORE/LOAD), DTO 세터, DI(@Qualifier·생성자 주입), 내장 SQL(JdbcTemplate), @Select
+tags: [static, field, di]
+queries:
+  - id: q2-grade
+    kind: flow
+    args: ["POST /customers/{id}/grade", grade]
+    expect:
+      - "메서드|com.f.CustomerController#grade(java.lang.String,java.lang.String)"
+      - "메서드|com.f.CustomerServiceImpl#changeGrade(java.lang.String,java.lang.String)"
+      - "필드|com.f.CustomerServiceImpl.lastGrade"
+      - "메서드|com.f.CustomerServiceImpl#lastGrade()"
+      - "메서드|com.f.CustomerController#last()"
+      - "Endpoint|GET /customers/last-grade"
+      - "메서드|com.f.Customer#setCustGrade(java.lang.String)"
+      - "필드|com.f.Customer.custGrade"
+      - "메서드|com.f.Customer#getCustGrade()"
+      - "SQL 바인드|com.f.CustomerMapper#updateGrade #{custGrade}"
+      - "컬럼|CUSTOMER.CUST_GRADE"
+      # 컬럼에 저장된 값은 그 컬럼을 읽는 SQL로 이어진다 (SET → SELECT)
+      - "SQL|com.f.CustomerMapper#findGrade(sql)"
+      - "메서드|com.f.CustomerController#find(java.lang.String)"
+      - "Endpoint|GET /customers/{id}"
+
+  - id: q1-cust-grade
+    kind: column
+    args: [CUSTOMER.CUST_GRADE]
+    expect:
+      - "SQL|com.f.CustomerMapper#updateGrade"
+      - "SQL|com.f.CustomerMapper#findGrade(sql)"
+      - "SQL 바인드|com.f.CustomerMapper#updateGrade #{custGrade}"
+      - "필드|com.f.Customer.custGrade"
+      - "메서드|com.f.Customer#setCustGrade(java.lang.String)"
+      - "메서드|com.f.CustomerServiceImpl#changeGrade(java.lang.String,java.lang.String)"
+      - "메서드|com.f.CustomerController#grade(java.lang.String,java.lang.String)"
+      - "Endpoint 입력|com.f.CustomerController#grade(java.lang.String,java.lang.String) (grade)"
+      - "Endpoint|POST /customers/{id}/grade"
+      - "메서드|com.f.CustomerController#find(java.lang.String)"
+      - "Endpoint|GET /customers/{id}"
+
+  # @Qualifier("mainCustomerService")로 레거시 구현은 컨트롤러에서 호출되지 않는다
+  - id: q1-legacy-column-stops-at-legacy
+    kind: column
+    args: [CUSTOMER_OLD.GRADE]
+    expect:
+      - "SQL|com.f.LegacyCustomerService#changeGrade$sql1@L13"
+      - "SQL 바인드|com.f.LegacyCustomerService#changeGrade$sql1@L13 #{?1}"
+      - "메서드|com.f.LegacyCustomerService#changeGrade(java.lang.String,java.lang.String)"
+
+  # Q3: 인터페이스 메서드 시그니처 변경 → DI로 연결된 호출자
+  - id: q3-interface
+    kind: method
+    args: ["com.f.CustomerService#changeGrade"]
+    expect:
+      - "직접 호출자|com.f.CustomerController#grade(java.lang.String,java.lang.String)"
+      - "Endpoint|POST /customers/{id}/grade"

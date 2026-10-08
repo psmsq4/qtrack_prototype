@@ -1,0 +1,2 @@
+sql select SELECT * FROM T WHERE ID = #{id} @L4
+sql update UPDATE T SET A = #{a} WHERE ID = #{id} @L6

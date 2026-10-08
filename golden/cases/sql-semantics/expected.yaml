@@ -1,0 +1,39 @@
+# FR-SQ (카탈로그 있음): 한정자 없는 컬럼, SELECT *, INSERT…SELECT(컬럼 목록 없음), CTAS 재사용, MERGE
+tags: [static, sql-semantics, meta]
+catalog: [catalog/schema.sql]
+queries:
+  - id: q1-grade-col-derives
+    kind: column
+    args: [CUSTOMER.CUST_GRADE]
+    expect:
+      - "SQL|com.s.GradeMapper#byGrade"
+      - "SQL|com.s.GradeMapper#byGradeView"
+      - "SQL|etl.sql#stmt2@L7"
+      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
+      - "SQL 바인드|com.s.GradeMapper#byGradeView #{g}"
+      - "컬럼|VIP_CUST.GRADE"
+      - "컬럼|VIP_REPORT.GRADE"
+      - "메서드|com.s.GradeController#byGrade(java.lang.String)"
+      - "메서드|com.s.GradeController#byGradeView(java.lang.String)"
+      - "Endpoint 입력|com.s.GradeController#byGrade(java.lang.String) (grade)"
+      - "Endpoint 입력|com.s.GradeController#byGradeView(java.lang.String) (g)"
+      - "Endpoint|GET /grades"
+      - "Endpoint|GET /grades/view"
+
+  - id: q1-amount-insert-select-merge
+    kind: column
+    args: [ORDERS.AMOUNT]
+    expect:
+      - "SQL|etl.sql#stmt1@L1"
+      - "SQL|etl.sql#stmt4@L14"
+      - "컬럼|ORDER_HIST.AMOUNT"
+      - "컬럼|CUST_SUMMARY.TOTAL_AMT"
+
+  - id: q2-unqualified-resolved
+    kind: flow
+    args: [GET /grades, grade]
+    expect:
+      - "메서드|com.s.GradeController#byGrade(java.lang.String)"
+      - "SQL|com.s.GradeMapper#byGrade"
+      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
+      - "컬럼|CUSTOMER.CUST_GRADE"

@@ -1,0 +1,3 @@
+inject  @L3
+inject fast @L4
+inject named @L5

@@ -42,6 +42,8 @@ public final class QueryEngine {
     }
 
     private static final AtomicInteger SEQ = new AtomicInteger();
+    /** 방문 상태 flags의 내부 비트: 이 노드에서 더 나아가지 않음. */
+    private static final int TERMINAL = 4;
     private final Snapshot g;
 
     public QueryEngine(Snapshot g) {
@@ -133,6 +135,9 @@ public final class QueryEngine {
         int allowed = o.allowed();
         while (!q.isEmpty()) {
             int v = q.poll();
+            // ENDPOINT는 요청(→FORMAL_IN)과 응답(FORMAL_OUT→) 양쪽에 닿는 경계 노드: 시작점이 아니면 통과하지 않는다
+            if (g.kind(v) == Kinds.ENDPOINT && !s.starts.contains(v)) continue;
+            if ((s.flags(v) & TERMINAL) != 0) continue;
             for (int m = mask; m != 0; m &= m - 1) {
                 int kind = Integer.numberOfTrailingZeros(m);
                 Csr c = g.csr(kind, s.reverse);
@@ -149,7 +154,11 @@ public final class QueryEngine {
                     }
                     int w = c.target(i);
                     if (s.seen(w)) continue;
-                    s.visit(w, v, s.dist(v) + 1, kind, Math.max(s.conf(v), conf), s.flags(v) | fl);
+                    // 정방향: 필터(WHERE/JOIN/GROUP·ORDER) 바인드가 닿은 컬럼은 값이 저장된 것이 아니므로 더 나아가지 않는다
+                    int term = !s.reverse && kind == Kinds.MAPS_TO && g.kind(w) == Kinds.COLUMN
+                            && (c.clause(i) == Kinds.CL_WHERE || c.clause(i) == Kinds.CL_JOIN_ON || c.clause(i) == Kinds.CL_GROUP_ORDER)
+                            ? TERMINAL : 0;
+                    s.visit(w, v, s.dist(v) + 1, kind, Math.max(s.conf(v), conf), (s.flags(v) | fl | term) & ~(term == 0 ? TERMINAL : 0));
                     q.add(w);
                 }
             }
@@ -186,12 +195,13 @@ public final class QueryEngine {
             for (int st : starts) for (boolean rv : new boolean[]{false, true}) {
                 Csr c = g.csr(Kinds.MAPS_TO, rv);
                 for (int i = c.begin(st), e = c.end(st); i < e; i++) {
+                    if (c.conf(i) > o.minConf) continue;
                     int w = c.target(i);
                     int owner = g.owner(w);
                     if (owner < 0) continue;
                     String target = g.methodSig(owner);
                     String key = "SQL|" + target;
-                    if (items.containsKey(key)) continue;
+                    if (items.containsKey(key) && items.get(key).distance() <= 1) continue;
                     long sp = g.span(w);
                     items.put(key, new QueryResult.Item(target, "SQL", 1, Kinds.CONF_NAMES[c.conf(i)],
                             (c.flags(i) & Kinds.F_IMPLICIT) != 0, false, -1, w, file(sp), line(sp)));

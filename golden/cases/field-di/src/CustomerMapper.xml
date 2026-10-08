@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.f.CustomerMapper">
+  <!-- parameterType 없음: Java 인터페이스 파라미터 타입(Customer)으로 DTO 프로퍼티를 해석 -->
+  <update id="updateGrade">
+    UPDATE CUSTOMER SET CUST_GRADE = #{custGrade} WHERE CUST_ID = #{custId}
+  </update>
+</mapper>

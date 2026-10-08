@@ -1,0 +1,59 @@
+# 직접 재귀 / 상호 재귀: SCC 고정점 요약 (FR-GR-06, D-03), 제어 의존 요약 마스크 (FR-CF-06)
+tags: [static, recursion]
+queries:
+  - id: q2-v-through-recursion
+    kind: flow
+    args: [POST /rec, v]
+    expect:
+      - "메서드|com.r.RecController#api(java.lang.String,int)"
+      - "메서드|com.r.RecController#walk(java.lang.String,int)"
+      - "메서드|com.r.RecController#even(java.lang.String,int)"
+      - "메서드|com.r.RecController#odd(java.lang.String,int)"
+      - "SQL|com.r.RecMapper#save"
+      - "SQL 바인드|com.r.RecMapper#save #{value}"
+      - "컬럼|REC_LOG.VAL"
+
+  - id: q2-depth-data-only
+    kind: flow
+    args: [POST /rec, depth]
+    expect:
+      - "메서드|com.r.RecController#api(java.lang.String,int)"
+      - "메서드|com.r.RecController#walk(java.lang.String,int)"
+
+  - id: q2-depth-with-control
+    kind: flow
+    args: [POST /rec, depth]
+    options: { control: true }
+    tags: [control]
+    expect:
+      - "메서드|com.r.RecController#api(java.lang.String,int)"
+      - "메서드|com.r.RecController#walk(java.lang.String,int)"
+      - "메서드|com.r.RecController#even(java.lang.String,int)"
+      - "메서드|com.r.RecController#odd(java.lang.String,int)"
+      - "SQL|com.r.RecMapper#save"
+      - "SQL 바인드|com.r.RecMapper#save #{value}"
+      - "컬럼|REC_LOG.VAL"
+
+  # 재귀가 있어도 파라미터가 반환으로 흐르지 않으면 요약도 없어야 한다 (오탐 방지)
+  - id: q2-noflow
+    kind: flow
+    args: [GET /noflow, w]
+    expect:
+      - "메서드|com.r.RecController#noflow(java.lang.String)"
+      - "메서드|com.r.RecController#noFlow(java.lang.String,int)"
+
+  - id: q1-rec-log
+    kind: column
+    args: [REC_LOG.VAL]
+    mode: contains
+    expect:
+      - "SQL|com.r.RecMapper#save"
+      - "메서드|com.r.RecController#api(java.lang.String,int)"
+      - "메서드|com.r.RecController#walk(java.lang.String,int)"
+      - "메서드|com.r.RecController#even(java.lang.String,int)"
+      - "메서드|com.r.RecController#odd(java.lang.String,int)"
+      - "Endpoint 입력|com.r.RecController#api(java.lang.String,int) (v)"
+      - "Endpoint|POST /rec"
+    absent:
+      - "Endpoint 입력|com.r.RecController#api(java.lang.String,int) (depth)"
+      - "Endpoint 입력|com.r.RecController#noflow(java.lang.String) (w)"

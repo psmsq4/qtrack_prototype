@@ -1,0 +1,6 @@
+# 클래스·메서드 경로 결합, 단축형(Spring 4.3+), 한정 이름 어노테이션, method 속성
+endpoint GET /orders @L5
+endpoint POST /orders/new @L7
+endpoint DELETE /orders/{id} @L9
+endpoint PATCH /orders/{id} @L11
+endpoint PUT /orders/bulk @L13
