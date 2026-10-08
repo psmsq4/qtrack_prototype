@@ -1,0 +1,170 @@
+// Q-Track 차세대 엔진 IR v1 (설계서 4장)
+// 추출기(Java/MyBatis/SQL)와 그래프 엔진 사이의 고정 계약입니다. [FR-IR-01]
+// 설계서 초안 대비 추가 항목은 "(추가)"로 표시합니다.
+syntax = "proto3";
+package qtrack.ir.v1;
+
+option java_package = "com.ids.qtrack.next.ir";
+option java_multiple_files = true;
+
+enum NodeKind {
+  FORMAL_IN = 0; FORMAL_OUT = 1; ACTUAL_IN = 2; ACTUAL_OUT = 3;
+  LOCAL = 4; BIND = 5; COLUMN = 6; FIELD = 7; ENDPOINT = 8; UNKNOWN = 9;
+  PREDICATE = 10;                 // FR-CF 조건 노드 [협의]
+  FIELD_LOAD = 11;                // (추가) 필드 읽기 결과 인터페이스 노드 (LOAD 간선의 도착점)
+  FIELD_STORE = 12;               // (추가) 필드 쓰기 값 인터페이스 노드 (STORE 간선의 출발점)
+}
+
+enum EdgeKind {
+  DEF_USE = 0; LOCAL_FLOW = 1; ARG_IN = 2; RET_OUT = 3; SUMMARY = 4;
+  STORE = 5; LOAD = 6; BIND_TO = 7; MAPS_TO = 8;
+  COL_DERIVES = 9; CONTROL = 10; CONTROL_FLOW = 11;  // CONTROL_FLOW는 빌더가 계산
+}
+
+enum BranchLabel { TRUE = 0; FALSE = 1; CASE = 2; DEFAULT = 3; EXCEPTION = 4; }
+enum Confidence { EXACT = 0; RESOLVED = 1; HEURISTIC = 2; }
+enum Clause { NONE = 0; SELECT_ITEM = 1; WHERE = 2; SET = 3; INSERT_VALUE = 4; JOIN_ON = 5; GROUP_ORDER = 6; }
+enum DeriveKind { DIRECT = 0; EXPR = 1; AGG = 2; }
+
+message Span { uint32 file_id = 1; uint32 start = 2; uint32 end = 3; uint32 line = 4; }
+
+message Node {
+  uint32 local_id = 1;
+  NodeKind kind = 2;
+  string name = 3;
+  Span span = 4;
+  uint32 ext = 5;                 // (추가) FIELD/COLUMN/ENDPOINT처럼 전역 노드를 가리킬 때 externals 인덱스+1
+}
+
+message Edge {
+  uint32 src = 1;
+  uint32 dst = 2;
+  EdgeKind kind = 3;
+  Confidence conf = 4;
+  Clause clause = 5;              // MAPS_TO, COL_DERIVES
+  bool implicit = 6;              // SQL 필터 경유 흐름 [FR-SQ-06]
+  BranchLabel label = 7;          // CONTROL
+  string case_value = 8;          // CONTROL, label = CASE
+  uint32 src_ext = 9;             // (추가) 출발이 메서드 밖 노드면 externals 인덱스+1
+  uint32 dst_ext = 10;            // (추가) 도착이 메서드 밖 노드면 externals 인덱스+1
+  DeriveKind derive = 11;         // (추가) COL_DERIVES의 DIRECT/EXPR/AGG
+}
+
+message ColumnKey { string data_source = 1; string schema = 2; string table = 3; string column = 4; }
+
+message ExternalRef {
+  oneof target {
+    string method_sig = 1;
+    ColumnKey column = 2;
+    string field = 3;             // Class.field (field-based 근사)
+    string endpoint = 4;          // (추가) "GET /api/orders"
+  }
+}
+
+enum CallKind {
+  VIRTUAL = 0;                    // 수신 객체 타입으로 해석
+  STATIC = 1;
+  THIS = 2;                       // this/암묵 수신 객체
+  SUPER = 3;
+  CONSTRUCTOR = 4;
+  DIRECT_TARGET = 5;              // 추출기가 대상을 확정 (내장 SQL 합성 메서드 등)
+}
+
+message CallSite {
+  repeated uint32 actual_in = 1;
+  uint32 actual_out = 2;
+  repeated string candidate_targets = 3;
+  Confidence conf = 4;
+  // (추가) 링크 단계 해석 입력
+  string method_name = 5;
+  string receiver_type = 6;       // 수신 객체의 선언 타입(FQN 추정). 모르면 빈 값
+  CallKind call_kind = 7;
+  Span span = 8;
+  uint32 receiver_field = 9;      // 수신 객체가 필드면 externals 인덱스+1 (DI 규칙 해석용)
+}
+
+message SqlMeta {                 // (추가) 합성 메서드의 SQL 정보
+  string namespace = 1;
+  string statement_id = 2;
+  string statement_type = 3;      // select/insert/update/delete/merge/ctas
+  repeated string param_names = 4;// FORMAL_IN 순서의 이름 (_parameter, @Param 이름 …)
+  uint32 variants = 5;            // 동적 SQL 전개 변형 수
+  uint32 parse_failures = 6;
+  bool dynamic = 7;
+  bool capped = 8;                // 전개 상한 초과로 축약
+  repeated string tables = 9;
+  string parameter_type = 10;
+  string result_type = 11;
+  string sample_sql = 12;
+}
+
+message MethodIR {
+  string signature = 1;           // pkg.Class#method(Type,…)
+  bool synthetic = 2;
+  repeated Node nodes = 3;
+  repeated Edge edges = 4;
+  repeated CallSite calls = 5;
+  repeated ExternalRef externals = 6;
+  // (추가)
+  string class_name = 7;
+  string name = 8;
+  repeated string param_types = 9;
+  repeated string param_names = 10;
+  string return_type = 11;
+  bool is_abstract = 12;
+  bool is_static = 13;
+  Span span = 14;
+  SqlMeta sql = 15;
+  repeated uint32 formal_in = 16; // 파라미터 순서의 FORMAL_IN local_id
+  uint32 formal_out = 17;         // FORMAL_OUT local_id + 1 (0 = 없음)
+}
+
+message FieldDecl {
+  string name = 1;
+  string type = 2;                // FQN 추정
+  bool injected = 3;              // DI 규칙(@Autowired, @Resource, 생성자 주입)으로 주입
+  string qualifier = 4;           // @Qualifier/@Resource(name)
+  string rule_id = 5;
+}
+
+message ClassIR {
+  string name = 1;                // FQN
+  string kind = 2;                // class/interface/enum/record
+  string super_class = 3;
+  repeated string interfaces = 4;
+  repeated string annotations = 5;
+  repeated FieldDecl fields = 6;
+  bool bean = 7;                  // 스프링 빈 (규칙으로 판정)
+  bool mapper = 8;                // MyBatis Mapper 인터페이스 (규칙으로 판정)
+  string bean_name = 9;
+  map<string, string> attrs = 10; // 규칙이 붙인 클래스 속성 (예: pathPrefix)
+  Span span = 11;
+}
+
+message EndpointParam {
+  string name = 1;                // 요청 파라미터 이름
+  uint32 formal_index = 2;        // 메서드 파라미터 순서
+  string source = 3;              // RequestParam/PathVariable/RequestBody …
+}
+
+message EndpointIR {
+  string http_method = 1;
+  string path = 2;
+  string method_signature = 3;
+  repeated EndpointParam params = 4;
+  string rule_id = 5;
+  Span span = 6;
+}
+
+message FileIR {
+  uint32 file_id = 1;
+  string path = 2;
+  bytes sha256 = 3;
+  repeated MethodIR methods = 4;
+  // (추가)
+  repeated ClassIR classes = 5;
+  repeated EndpointIR endpoints = 6;
+  string language = 7;            // java / mybatis / sql
+  uint32 error_nodes = 8;         // 건너뛴 ERROR/MISSING 노드 수 [FR-IN-01]
+  repeated string diagnostics = 9;
+}

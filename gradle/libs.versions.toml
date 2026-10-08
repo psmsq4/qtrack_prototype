@@ -1,0 +1,26 @@
+[versions]
+jtreesitter = "0.26.1"
+treesitter-core = "0.26.1"
+treesitter-java = "0.23.5"
+jsqlparser = "5.4"
+protobufJava = "4.36.2"
+protobufPlugin = "0.9.6"
+snakeyaml = "2.7"
+duckdb = "1.5.6.0"
+picocli = "4.7.7"
+junit = "5.14.3"
+jmh = "1.37"
+
+[libraries]
+jtreesitter = { module = "io.github.tree-sitter:jtreesitter", version.ref = "jtreesitter" }
+jsqlparser = { module = "com.github.jsqlparser:jsqlparser", version.ref = "jsqlparser" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobufJava" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
+duckdb = { module = "org.duckdb:duckdb_jdbc", version.ref = "duckdb" }
+picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+jmh-core = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmh" }
+jmh-annprocess = { module = "org.openjdk.jmh:jmh-generator-annprocess", version.ref = "jmh" }
+
+[plugins]
+protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
