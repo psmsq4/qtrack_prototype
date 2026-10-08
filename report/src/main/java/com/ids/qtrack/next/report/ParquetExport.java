@@ -77,7 +77,50 @@ public final class ParquetExport {
             }
             st.execute("COPY impact TO '" + esc(dir.resolve("impact.parquet")) + "' (FORMAT PARQUET)");
             st.execute("COPY path_step TO '" + esc(dir.resolve("path_step.parquet")) + "' (FORMAT PARQUET)");
+            if (r.graph != null) writeGraph(c, st, r, dir);
         }
+    }
+
+    /** 전체 흐름 (--graph): graph_node / graph_edge Parquet + graph.dot. */
+    private static void writeGraph(Connection c, Statement st, QueryResult r, Path dir) throws IOException, SQLException {
+        st.execute("CREATE TABLE graph_node(key VARCHAR, gid INTEGER, method VARCHAR, lid INTEGER, kind VARCHAR, name VARCHAR,"
+                + " file VARCHAR, line INTEGER, conditions VARCHAR, is_start BOOLEAN, level INTEGER)");
+        st.execute("CREATE TABLE graph_edge(from_key VARCHAR, to_key VARCHAR, kind VARCHAR, confidence VARCHAR, label VARCHAR,"
+                + " implicit BOOLEAN, control BOOLEAN, expanded_from VARCHAR)");
+        try (PreparedStatement p = c.prepareStatement("INSERT INTO graph_node VALUES (?,?,?,?,?,?,?,?,?,?,?)")) {
+            for (QueryResult.GNode n : r.graph.nodes.values()) {
+                p.setString(1, n.key());
+                p.setInt(2, n.gid());
+                p.setString(3, n.method());
+                p.setInt(4, n.lid());
+                p.setString(5, n.kind());
+                p.setString(6, n.name());
+                p.setString(7, n.file());
+                p.setInt(8, n.line());
+                p.setString(9, n.conditions());
+                p.setBoolean(10, n.start());
+                p.setInt(11, r.graph.level);
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        try (PreparedStatement p = c.prepareStatement("INSERT INTO graph_edge VALUES (?,?,?,?,?,?,?,?)")) {
+            for (QueryResult.GEdge e : r.graph.edges) {
+                p.setString(1, e.from());
+                p.setString(2, e.to());
+                p.setString(3, e.kind());
+                p.setString(4, e.conf());
+                p.setString(5, e.label());
+                p.setBoolean(6, e.implicit());
+                p.setBoolean(7, e.control());
+                p.setString(8, e.via());
+                p.addBatch();
+            }
+            p.executeBatch();
+        }
+        st.execute("COPY graph_node TO '" + esc(dir.resolve("graph_node.parquet")) + "' (FORMAT PARQUET)");
+        st.execute("COPY graph_edge TO '" + esc(dir.resolve("graph_edge.parquet")) + "' (FORMAT PARQUET)");
+        Files.writeString(dir.resolve("graph.dot"), GraphDot.render(r.graph, r.kind + " " + r.query + "  (graph " + r.graph.level + ")"));
     }
 
     /** 인덱스의 인터페이스·전역 노드 표 (node.parquet). */

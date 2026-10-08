@@ -32,7 +32,16 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </pre>
  */
 public final class QueryEngine {
-    public record Options(int minConf, boolean implicit, boolean control, int maxPaths) {
+    /** graph: 0 = 없음, 1 = 탐색한 상주 그래프 전체, 2 = DEF_USE(L2)·LOCAL_FLOW·SUMMARY까지 펼침. */
+    public record Options(int minConf, boolean implicit, boolean control, int maxPaths, int graph) {
+        public Options(int minConf, boolean implicit, boolean control, int maxPaths) {
+            this(minConf, implicit, control, maxPaths, 0);
+        }
+
+        public Options withGraph(int level) {
+            return new Options(minConf, implicit, control, maxPaths, level);
+        }
+
         public static Options defaults() {
             return new Options(Kinds.HEURISTIC, false, false, 500);
         }
@@ -72,6 +81,8 @@ public final class QueryEngine {
         final MemorySegment parent, dist, meta;           // meta: [kind+1, weakestConf, flags] 노드당 3바이트
         final List<Integer> order = new ArrayList<>();
         final Set<Integer> starts = new LinkedHashSet<>();
+        /** --graph: 탐색이 실제로 지난 간선 (데이터 흐름 방향) {src, dst, kind, conf, flags}. */
+        List<int[]> edges;
 
         Slice(boolean reverse) {
             this.reverse = reverse;
@@ -124,6 +135,7 @@ public final class QueryEngine {
 
     Slice slice(Set<Integer> starts, boolean reverse, int p1, int p2, Options o) {
         Slice s = new Slice(reverse);
+        if (o.graph() > 0) s.edges = new ArrayList<>();
         for (int st : starts) {
             if (st < 0 || st >= g.nodeCount() || s.seen(st)) continue;
             s.visit(st, -1, 0, -1, 0, 0);
@@ -156,6 +168,8 @@ public final class QueryEngine {
                         if ((fl & ~allowed) != 0) continue;
                     }
                     int w = c.target(i);
+                    if (s.edges != null)
+                        s.edges.add(s.reverse ? new int[]{w, v, kind, conf, fl} : new int[]{v, w, kind, conf, fl});
                     if (s.seen(w)) continue;
                     // 정방향: 필터(WHERE/JOIN/GROUP·ORDER) 바인드가 닿은 컬럼은 값이 저장된 것이 아니므로 더 나아가지 않는다
                     int term = !s.reverse && kind == Kinds.MAPS_TO && g.kind(w) == Kinds.COLUMN
@@ -212,6 +226,7 @@ public final class QueryEngine {
             }
             r.items.addAll(sorted(items.values()));
             r.stats.put("visited", rev.order.size() + fwd.order.size());
+            if (o.graph() > 0) r.graph = new FlowGraph(this, g, lines, o).build(List.of(rev, fwd));
         }
         finish(r, t0);
         return r;
@@ -263,6 +278,7 @@ public final class QueryEngine {
             collect(fwd, r, items, new HashMap<>(), o);
             r.items.addAll(sorted(items.values()));
             r.stats.put("visited", fwd.order.size());
+            if (o.graph() > 0) r.graph = new FlowGraph(this, g, lines, o).build(List.of(fwd));
         }
         finish(r, t0);
         return r;
@@ -291,11 +307,13 @@ public final class QueryEngine {
             q.add(m);
         }
         Csr call = g.callRev;
+        List<int[]> callEdges = new ArrayList<>();                      // --graph: {caller, callee, site, conf}
         while (!q.isEmpty()) {                                          // 역방향 호출 그래프 (DI 해석 포함)
             int m = q.poll();
             for (int i = call.begin(m), e = call.end(m); i < e; i++) {
                 if (call.conf(i) > o.minConf) continue;
                 int caller = call.target(i);
+                callEdges.add(new int[]{caller, m, call.site(i), call.conf(i)});
                 if (dist[caller] >= 0) continue;
                 dist[caller] = dist[m] + 1;
                 parent[caller] = m;
@@ -332,6 +350,7 @@ public final class QueryEngine {
                     r.items.add(new QueryResult.Item(g.name(ep), "Endpoint", 1, "EXACT", false, false, -1, ep,
                             file(g.span(ep)), line(g.span(ep))));
         r.items.sort((a, b) -> a.distance() != b.distance() ? Integer.compare(a.distance(), b.distance()) : a.target().compareTo(b.target()));
+        if (o.graph() > 0) r.graph = FlowGraph.callGraph(g, lines, o.graph(), ms, callEdges);
         finish(r, t0);
         return r;
     }
@@ -498,6 +517,7 @@ public final class QueryEngine {
         r.options.put("minConf", Kinds.CONF_NAMES[o.minConf]);
         r.options.put("implicit", o.implicit);
         r.options.put("control", o.control);
+        if (o.graph() > 0) r.options.put("graph", o.graph());
     }
 
     private void finish(QueryResult r, long t0) {

@@ -15,6 +15,26 @@ public final class QueryResult {
     public record Step(int pathId, int seq, int gid, String kind, String name, String file, int line, String via,
                        String conditions) {}
 
+    /** 전체 흐름 그래프의 노드. key: 상주 노드 "g&lt;gid&gt;", L2 노드 "l&lt;method&gt;:&lt;lid&gt;", Q3 메서드 "m&lt;method&gt;". */
+    public record GNode(String key, int gid, String method, int lid, String kind, String name, String file, int line,
+                        String conditions, boolean start) {}
+
+    /** 전체 흐름 그래프의 간선 (데이터 흐름 방향). via: 펼치기 전 간선 종류 (graph 2에서 펼쳐진 경우). */
+    public record GEdge(String from, String to, String kind, String conf, String label, boolean implicit, boolean control,
+                        String via) {}
+
+    /** --graph 1: 탐색이 지나간 상주 그래프 전체, --graph 2: LOCAL_FLOW·CONTROL_FLOW·SUMMARY를 모두 펼친 그래프. */
+    public static final class FlowGraph {
+        public final int level;
+        public final Map<String, GNode> nodes = new LinkedHashMap<>();
+        public final List<GEdge> edges = new ArrayList<>();
+
+        public FlowGraph(int level) {
+            this.level = level;
+        }
+    }
+
+    public FlowGraph graph;
     public final String queryId;
     public final String kind;
     public final String query;
@@ -70,6 +90,41 @@ public final class QueryResult {
             st.add(x);
         }
         m.put("steps", st);
+        if (graph != null) {
+            Map<String, Object> gm = new LinkedHashMap<>();
+            gm.put("level", graph.level);
+            List<Object> ns = new ArrayList<>();
+            for (GNode n : graph.nodes.values()) {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("key", n.key());
+                x.put("gid", n.gid());
+                x.put("method", n.method());
+                x.put("lid", n.lid());
+                x.put("kind", n.kind());
+                x.put("name", n.name());
+                x.put("file", n.file());
+                x.put("line", n.line());
+                x.put("conditions", n.conditions());
+                x.put("start", n.start());
+                ns.add(x);
+            }
+            gm.put("nodes", ns);
+            List<Object> es = new ArrayList<>();
+            for (GEdge e : graph.edges) {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("from", e.from());
+                x.put("to", e.to());
+                x.put("kind", e.kind());
+                x.put("conf", e.conf());
+                x.put("label", e.label());
+                x.put("implicit", e.implicit());
+                x.put("control", e.control());
+                x.put("via", e.via());
+                es.add(x);
+            }
+            gm.put("edges", es);
+            m.put("graph", gm);
+        }
         return m;
     }
 }

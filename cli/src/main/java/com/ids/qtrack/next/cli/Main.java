@@ -68,9 +68,11 @@ public final class Main implements Runnable {
         @Option(names = "--control", description = "제어 의존(CONTROL_FLOW) 경유 포함 (FR-CF-06)") boolean control;
         @Option(names = "--out", description = "결과 디렉터리 (result.json, impact.parquet, path_step.parquet)") Path out;
         @Option(names = "--paths", description = "경로를 콘솔에 출력") boolean showPaths;
+        @Option(names = "--graph", defaultValue = "0", description = "전체 흐름 그래프: 1 = 탐색한 상주 그래프 전체, "
+                + "2 = LOCAL_FLOW·CONTROL_FLOW(L2 DEF_USE)·SUMMARY(호출된 메서드 안)까지 펼침") int graph;
 
         QueryEngine.Options opts() {
-            return new QueryEngine.Options(Kinds.conf(minConf), implicit, control, 500);
+            return new QueryEngine.Options(Kinds.conf(minConf), implicit, control, 500, graph);
         }
 
         abstract QueryResult run(QueryEngine q);
@@ -101,6 +103,33 @@ public final class Main implements Runnable {
                                 + (s.conditions().isEmpty() ? "" : "  [" + s.conditions() + "]"));
             }
             System.out.println("stats " + r.stats);
+            if (r.graph != null) printGraph(r.graph);
+        }
+
+        /** 전체 흐름: 출발 노드의 메서드별로 묶어 간선을 출력합니다. */
+        static void printGraph(QueryResult.FlowGraph gr) {
+            System.out.println("\n## 전체 흐름 (graph " + gr.level + "): 노드 " + gr.nodes.size() + ", 간선 " + gr.edges.size());
+            java.util.List<QueryResult.GEdge> es = new java.util.ArrayList<>(gr.edges);
+            java.util.Comparator<QueryResult.GEdge> byMethod = java.util.Comparator.comparing(e -> gr.nodes.get(e.from()).method());
+            es.sort(byMethod.thenComparingInt(e -> gr.nodes.get(e.from()).line()).thenComparing(e -> gr.nodes.get(e.from()).key()));
+            String cur = null;
+            for (QueryResult.GEdge e : es) {
+                QueryResult.GNode a = gr.nodes.get(e.from()), b = gr.nodes.get(e.to());
+                String m = a.method().isEmpty() ? "(전역 노드)" : a.method();
+                if (!m.equals(cur)) {
+                    System.out.println("[" + m + "]");
+                    cur = m;
+                }
+                String kind = e.kind() + (e.label().isEmpty() ? "" : " " + e.label())
+                        + (e.implicit() ? " imp" : "") + (e.via().isEmpty() ? "" : " ⊂" + e.via());
+                System.out.println("  " + desc(a) + "  ─" + kind + "→  " + desc(b)
+                        + (b.method().equals(a.method()) || b.method().isEmpty() ? "" : "  @" + b.method()));
+            }
+        }
+
+        static String desc(QueryResult.GNode n) {
+            return (n.start() ? "*" : "") + n.kind() + " " + n.name() + (n.line() > 0 ? " (L" + n.line() + ")" : "")
+                    + (n.conditions().isEmpty() ? "" : " [" + n.conditions() + "]");
         }
     }
 

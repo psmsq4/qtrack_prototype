@@ -90,7 +90,67 @@ public final class HtmlReport {
                         .append("</td></tr>");
             }
         }
-        out.append("</tbody></table></section>");
+        out.append("</tbody></table>");
+        if (java.nio.file.Files.exists(q.resolve("graph_edge.parquet"))) flowSection(st, q, out);
+        out.append("</section>");
+    }
+
+    /** 전체 흐름 (--graph 1|2): Graphviz SVG + 메서드별 간선 표. */
+    private static void flowSection(Statement st, Path q, StringBuilder out) throws SQLException {
+        String nodes = ParquetExport.esc(q.resolve("graph_node.parquet"));
+        String edges = ParquetExport.esc(q.resolve("graph_edge.parquet"));
+        int level = 0, nn = 0, ne = 0;
+        try (ResultSet rs = st.executeQuery("SELECT max(level), count(*) FROM read_parquet('" + nodes + "')")) {
+            if (rs.next()) {
+                level = rs.getInt(1);
+                nn = rs.getInt(2);
+            }
+        }
+        try (ResultSet rs = st.executeQuery("SELECT count(*) FROM read_parquet('" + edges + "')")) {
+            if (rs.next()) ne = rs.getInt(1);
+        }
+        out.append("<h3>전체 흐름 (graph ").append(level).append(")</h3><div class=\"muted\">")
+                .append(level >= 2 ? "LOCAL_FLOW·CONTROL_FLOW는 L2 DEF_USE·CONTROL로, SUMMARY는 호출된 메서드 안의 흐름(ARG_IN → … → RET_OUT)으로 펼침. "
+                        : "탐색이 지나간 상주 간선 전체. ")
+                .append("노드 ").append(nn).append(" · 간선 ").append(ne)
+                .append(" · 굵은 빨간 테두리 = 시작점, 마름모 = 조건(PREDICATE), 점선 = 제어 의존</div>");
+        Path dot = q.resolve("graph.dot");
+        String svg = java.nio.file.Files.exists(dot) ? GraphDot.svg(dot) : null;
+        if (svg != null) out.append("<div class=\"graph\">").append(svg).append("</div>");
+        else out.append("<div class=\"muted\">그래프 그림: Graphviz(dot)가 없어 생략 — <code>dot -Tsvg graph.dot</code> 로 직접 렌더링</div>");
+        out.append("<details").append(svg == null ? " open" : "").append("><summary>간선 목록 (메서드별)</summary>");
+        out.append("<table class=\"flow\"><thead><tr><th>출발</th><th>간선</th><th>도착</th></tr></thead><tbody>");
+        String cur = null;
+        try (ResultSet rs = st.executeQuery("SELECT a.method, a.kind, a.name, a.line, a.conditions, a.is_start, e.kind, e.label,"
+                + " e.confidence, e.implicit, e.expanded_from, b.kind, b.name, b.line, b.conditions, b.method"
+                + " FROM read_parquet('" + edges + "') e"
+                + " JOIN read_parquet('" + nodes + "') a ON e.from_key = a.key"
+                + " JOIN read_parquet('" + nodes + "') b ON e.to_key = b.key"
+                + " ORDER BY a.method, a.line, a.key, b.line")) {
+            while (rs.next()) {
+                String m = rs.getString(1) == null || rs.getString(1).isEmpty() ? "(전역 노드)" : rs.getString(1);
+                if (!m.equals(cur)) {
+                    out.append("<tr class=\"grp\"><td colspan=\"3\"><code>").append(h(m)).append("</code></td></tr>");
+                    cur = m;
+                }
+                String edge = rs.getString(7) + (rs.getString(8) == null || rs.getString(8).isEmpty() ? "" : " " + rs.getString(8));
+                String meta = rs.getString(9) + (rs.getBoolean(10) ? " · implicit" : "")
+                        + (rs.getString(11) == null || rs.getString(11).isEmpty() ? "" : " · ⊂" + rs.getString(11));
+                String other = rs.getString(16) == null || rs.getString(16).isEmpty() || rs.getString(16).equals(rs.getString(1))
+                        ? "" : "<div class=\"loc\">" + h(rs.getString(16)) + "</div>";
+                out.append("<tr><td>").append(cell(rs.getBoolean(6), rs.getString(2), rs.getString(3), rs.getInt(4), rs.getString(5)))
+                        .append("</td><td><span class=\"kind\">").append(h(edge)).append("</span><div class=\"loc\">").append(h(meta))
+                        .append("</div></td><td>").append(cell(false, rs.getString(12), rs.getString(13), rs.getInt(14), rs.getString(15)))
+                        .append(other).append("</td></tr>");
+            }
+        }
+        out.append("</tbody></table></details>");
+    }
+
+    private static String cell(boolean start, String kind, String name, int line, String cond) {
+        return (start ? "<b>★ </b>" : "") + "<span class=\"kind\">" + h(kind) + "</span> <code>" + h(name) + "</code>"
+                + (line > 0 ? " <span class=\"loc\">L" + line + "</span>" : "")
+                + (cond == null || cond.isEmpty() ? "" : "<div class=\"cond\">" + h(cond) + "</div>");
     }
 
     private static String sourceLine(String file, int line) {
@@ -141,6 +201,10 @@ public final class HtmlReport {
                 .cond{font-size:12px;color:var(--resolved)}
                 ol.path{margin:6px 0 0 18px;padding:0}ol.path li{margin:4px 0}
                 details summary{cursor:pointer;color:var(--accent);font-size:12px}
+                h3{font-size:14px;margin:20px 0 6px}
+                .graph{overflow:auto;max-height:80vh;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}
+                .graph svg{max-width:none;height:auto}
+                table.flow tr.grp td{background:var(--code);font-weight:600}
                 @media (max-width:640px){td:nth-child(5),th:nth-child(5),td:nth-child(6),th:nth-child(6){display:none}}
                 </style></head><body>
                 <h1>Q-Track Next 영향도 리포트</h1>

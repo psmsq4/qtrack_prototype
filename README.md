@@ -47,6 +47,11 @@ $Q stats  --index index/fdi                        # 노드·간선 수, NFR-06 
 ```
 
 질의 옵션
+- `--graph 1|2`: **전체 흐름** (대상별 대표 경로가 아니라 탐색이 지나간 모든 갈래)
+  - `1`: 2단계 탐색이 실제로 지난 상주 간선 전부 (LOCAL_FLOW·SUMMARY 등은 그대로)
+  - `2`: 모두 펼침 — LOCAL_FLOW·CONTROL_FLOW → L2 DEF_USE·CONTROL(LOCAL·PREDICATE 포함), SUMMARY → `ARG_IN → 호출된 메서드 안 → RET_OUT` (재귀는 이미 펼친 본문으로 잇는 순환)
+  - 콘솔에 메서드별 간선 목록, `--out`이면 `graph_node.parquet`·`graph_edge.parquet`·`graph.dot`, HTML 리포트에 "전체 흐름" 섹션(Graphviz가 있으면 그림 포함)
+  - Q3(`query method`)는 메서드 단위 호출 그래프
 - `--min-conf EXACT|RESOLVED|HEURISTIC`: 신뢰도 필터 (FR-QR-05, 값이 작을수록 확정적 — D-07)
 - `--implicit`: WHERE 바인드 → 결과행 같은 **암묵적 흐름** 포함 (FR-SQ-06, D-06)
 - `--control`: **제어 의존(CONTROL_FLOW) 경유** 포함 (FR-CF-06). 꺼져 있어도 `--paths`/HTML 경로에는 각 값의 조건 사슬을 표시합니다.
