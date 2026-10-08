@@ -1,0 +1,25 @@
+# Tier C 내장 SQL: JdbcTemplate / JDBC 호출의 SQL 문자열 인자 (설계서 2.1 Tier C)
+# sqlArg = SQL 인자 위치, bindArgsFrom = ? 바인드에 순서대로 대응하는 인자의 시작 위치 (-1 = 없음)
+rules:
+  - id: jdbc.template-update
+    match: |
+      (method_invocation
+        object: (_) @o (#match? @o "(?i)jdbc|template")
+        name: (identifier) @n (#match? @n "^(update|execute|batchUpdate)$")) @call
+    emit:
+      jdbc: { call: "@call", sqlArg: "0", bindArgsFrom: "1" }
+
+  - id: jdbc.template-query
+    match: |
+      (method_invocation
+        object: (_) @o (#match? @o "(?i)jdbc|template")
+        name: (identifier) @n (#match? @n "^(query|queryForObject|queryForList|queryForMap|queryForRowSet)$")) @call
+    emit:
+      jdbc: { call: "@call", sqlArg: "0", bindArgsFrom: "2" }
+
+  - id: jdbc.prepare-statement
+    match: |
+      (method_invocation
+        name: (identifier) @n (#match? @n "^(prepareStatement|prepareCall|executeQuery|executeUpdate)$")) @call
+    emit:
+      jdbc: { call: "@call", sqlArg: "0", bindArgsFrom: "-1" }

@@ -1,0 +1,18 @@
+# MyBatis (FR-IN-06 ④): @Mapper 인터페이스, 어노테이션 SQL(@Select 등). XML 연결은 namespace.id로 엔진이 수행.
+rules:
+  - id: mybatis.mapper
+    match: |
+      (interface_declaration
+        (modifiers
+          [(annotation name: (_) @a) (marker_annotation name: (_) @a)]
+          (#match? @a "(^|[.])Mapper$"))) @c
+    emit:
+      mapper: { class: "@c" }
+
+  - id: mybatis.annotation-sql
+    match: |
+      (method_declaration
+        (modifiers
+          (annotation name: (_) @a (#match? @a "^(Select|Insert|Update|Delete)$")) @ann)) @m
+    emit:
+      sql: { method: "@m", text: "annText(@ann)", type: "lower(text(@a))" }

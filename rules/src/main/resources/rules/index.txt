@@ -1,0 +1,5 @@
+# 내장 기본 Rule Pack. 프레임워크/버전별 디렉터리 (설계서 3.3)
+spring/context-6.x.yaml
+spring/web-6.x.yaml
+mybatis/mybatis-3.x.yaml
+jdbc/spring-jdbc-6.x.yaml

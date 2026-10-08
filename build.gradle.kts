@@ -16,7 +16,7 @@ subprojects {
     tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
         options.release.set(25)
-        options.compilerArgs.addAll(listOf("-parameters", "-Xlint:all,-serial,-processing,-this-escape"))
+        options.compilerArgs.addAll(listOf("-parameters", "-Xlint:all,-serial,-processing,-this-escape,-restricted"))
     }
     dependencies {
         "testImplementation"(platform(rootProject.libs.junit.bom))

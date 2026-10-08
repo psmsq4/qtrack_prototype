@@ -1,0 +1,125 @@
+# 내장 라이브러리 요약 (FR-IN-07, 설계서 3.1). 타입 단순 이름 → 메서드 → 흐름
+#   recv  : 수신 객체 → 결과       args : 모든 인자 → 결과      argN : N번째 인자 → 결과
+#   mut   : 인자 → 수신 객체 (변경. 수신 객체가 지역 변수면 새 SSA 버전)
+#   none  : 결과로 흐르지 않음
+# 요약이 없는 외부 호출은 수신 객체·모든 인자 → 결과 HEURISTIC 흐름으로 둡니다.
+String:
+  trim: recv
+  strip: recv
+  toUpperCase: recv
+  toLowerCase: recv
+  substring: recv
+  concat: recv,args
+  replace: recv,args
+  replaceAll: recv,args
+  split: recv
+  charAt: recv
+  toCharArray: recv
+  intern: recv
+  formatted: recv,args
+  valueOf: args
+  format: args
+  join: args
+  equals: recv,args
+  equalsIgnoreCase: recv,args
+  isEmpty: recv
+  isBlank: recv
+  length: recv
+  startsWith: recv,args
+  endsWith: recv,args
+  contains: recv,args
+  indexOf: recv,args
+  getBytes: recv
+StringBuilder: &sb
+  append: recv,args,mut
+  insert: recv,args,mut
+  toString: recv
+  reverse: recv
+  length: recv
+StringBuffer: *sb
+List: &list
+  add: mut
+  addAll: mut
+  set: mut
+  get: recv
+  getFirst: recv
+  getLast: recv
+  remove: recv
+  iterator: recv
+  stream: recv
+  toArray: recv
+  subList: recv
+  size: none
+  isEmpty: none
+  contains: recv,args
+  of: args
+  copyOf: args
+ArrayList: *list
+LinkedList: *list
+Collection: *list
+Set: *list
+HashSet: *list
+Iterator:
+  next: recv
+Map: &map
+  put: mut
+  putAll: mut
+  putIfAbsent: mut
+  get: recv
+  getOrDefault: recv,args
+  values: recv
+  keySet: recv
+  entrySet: recv
+  containsKey: recv,args
+  of: args
+HashMap: *map
+LinkedHashMap: *map
+Optional:
+  of: args
+  ofNullable: args
+  get: recv
+  orElse: recv,args
+  orElseGet: recv,args
+  orElseThrow: recv
+  map: recv,args
+  isPresent: recv
+Stream:
+  map: recv,args
+  filter: recv
+  collect: recv
+  toList: recv
+  forEach: none
+  findFirst: recv
+  sorted: recv
+  distinct: recv
+  flatMap: recv,args
+Objects:
+  requireNonNull: arg0
+  toString: arg0
+  equals: args
+  hash: args
+Integer: &num
+  parseInt: arg0
+  parseLong: arg0
+  valueOf: arg0
+  toString: recv,args
+  intValue: recv
+  longValue: recv
+Long: *num
+Double: *num
+BigDecimal:
+  add: recv,args
+  subtract: recv,args
+  multiply: recv,args
+  valueOf: args
+Arrays:
+  asList: args
+  copyOf: arg0
+Collections:
+  unmodifiableList: arg0
+  singletonList: arg0
+  emptyList: none
+"*":
+  toString: recv
+  hashCode: recv
+  getClass: none

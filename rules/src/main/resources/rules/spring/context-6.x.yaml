@@ -1,0 +1,42 @@
+# Spring DI (FR-IN-06 ③): 빈 선언, 필드 주입(@Autowired/@Inject/@Resource), 생성자 주입, Lombok 생성자 주입
+rules:
+  - id: spring.bean
+    match: |
+      (class_declaration
+        (modifiers
+          [(annotation name: (_) @a) (marker_annotation name: (_) @a)] @ann
+          (#match? @a "^(Service|Component|Repository|Controller|RestController)$"))
+        name: (identifier) @n) @c
+    emit:
+      bean: { class: "@c", name: "coalesce(annValue(@ann), decap(text(@n)))" }
+
+  - id: spring.field-injection
+    match: |
+      (field_declaration
+        (modifiers
+          [(annotation name: (_) @a) (marker_annotation name: (_) @a)]
+          (#match? @a "^(Autowired|Inject|Resource)$"))) @f
+    emit:
+      inject: { target: "@f", qualifier: "coalesce(annOf(@f, 'Qualifier'), annOf(@f, 'Resource', 'name'), annOf(@f, 'Named'))" }
+
+  - id: spring.constructor-injection
+    match: |
+      (class_declaration
+        (modifiers
+          [(annotation name: (_) @a) (marker_annotation name: (_) @a)]
+          (#match? @a "^(Service|Component|Repository|Controller|RestController)$"))
+        body: (class_body
+          (constructor_declaration
+            parameters: (formal_parameters (formal_parameter) @p))))
+    emit:
+      inject: { target: "@p", qualifier: "annOf(@p, 'Qualifier')" }
+
+  - id: lombok.required-args-injection
+    match: |
+      (class_declaration
+        (modifiers
+          (marker_annotation name: (_) @a (#match? @a "^(RequiredArgsConstructor|AllArgsConstructor)$")))
+        body: (class_body
+          (field_declaration (modifiers "final")) @f))
+    emit:
+      inject: { target: "@f", qualifier: "annOf(@f, 'Qualifier')" }

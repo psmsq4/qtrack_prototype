@@ -1,0 +1,27 @@
+# Spring Web 요청 매핑 (FR-IN-06 ①②). 단축형 @GetMapping 등과 클래스·메서드 경로 결합을 포함합니다.
+rules:
+  - id: spring.controller-prefix
+    query: controller-prefix.scm
+    emit:
+      classAttr: { class: "@c", key: "pathPrefix", value: "annValue(@ann)" }
+
+  - id: spring.request-mapping
+    query: request-mapping.scm
+    emit:
+      endpoint:
+        method: "@m"
+        httpMethod: "coalesce(lookup(simpleName(text(@a)), GetMapping=GET, PostMapping=POST, PutMapping=PUT, DeleteMapping=DELETE, PatchMapping=PATCH), upper(annAttr(@ann, 'method')), 'ANY')"
+        path: "concatPath(classAttr(@m, 'pathPrefix'), annValue(@ann))"
+
+  - id: spring.request-param
+    match: |
+      (formal_parameter
+        (modifiers
+          [(annotation name: (_) @a) (marker_annotation name: (_) @a)] @ann
+          (#match? @a "^(RequestParam|PathVariable|RequestBody|RequestHeader|ModelAttribute|CookieValue)$"))
+        name: (identifier) @p) @fp
+    emit:
+      endpointParam:
+        param: "@fp"
+        name: "coalesce(annAttr(@ann, 'name'), annValue(@ann), text(@p))"
+        source: "text(@a)"
