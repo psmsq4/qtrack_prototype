@@ -1,9 +1,12 @@
+# 빌드 산출물: 루트와 모듈 바로 아래 build/ 만 (패키지 디렉터리 .../build/ 는 소스이므로 제외하면 안 됨)
+/build/
+/*/build/
 .gradle/
-build/
 *.iml
 .idea/
 out/
-/index/
-/report/
-/work/
 .claude/
+# 실행 산출물 (모듈 이름과 겹치지 않게)
+/index/
+/report-out/
+/work/
