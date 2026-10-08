@@ -136,6 +136,7 @@ final class MethodLowering {
     private final List<Integer> formalIns = new ArrayList<>();
     private Block cur, exit;
     private int formalOut = -1;
+    private int thisVal = -1;
     private int tryCount, sqlCount;
     private String pendingLabel;
     int errorNodes;
@@ -165,6 +166,11 @@ final class MethodLowering {
             for (Node p : ps.getNamedChildren())
                 if (p.getType().equals("formal_parameter") || p.getType().equals("spread_parameter")) params.add(p);
         });
+        // 설계서 5.2 배치 규칙: 인스턴스 메서드는 this가 FORMAL_IN 0번 (생성자는 this 없음 — 결과 객체가 ACTUAL_OUT)
+        if (hasThis()) {
+            thisVal = newVal(NodeKind.FORMAL_IN, "this", decl.getChildByFieldName("name").orElse(decl));
+            formalIns.add(thisVal);
+        }
         for (int i = 0; i < params.size(); i++) {
             Node p = params.get(i);
             String name = i < info.paramNames.size() ? info.paramNames.get(i) : "p" + i;
@@ -198,6 +204,10 @@ final class MethodLowering {
             }
         }
         return emit(cd);
+    }
+
+    boolean hasThis() {
+        return !info.isStatic && !info.isConstructor;
     }
 
     private void ensureFormalOut() {
@@ -746,7 +756,7 @@ final class MethodLowering {
                 return ident(n);
             }
             case "this" -> {
-                return new R(List.of(), cls.fqn);
+                return thisVal >= 0 ? R.of(thisVal, cls.fqn) : new R(List.of(), cls.fqn);
             }
             case "string_literal", "text_block" -> {
                 return new R(List.of(), "java.lang.String");
@@ -1100,7 +1110,19 @@ final class MethodLowering {
                 conf = Confidence.HEURISTIC_VALUE;
             }
         }
-        if (project) return projectCall(inv, name, args, kind, rtype, recvField, targets, conf);
+        if (project) {
+            // 인스턴스 메서드 호출: 수신 객체를 ACTUAL_IN[0]으로 (대상의 this FORMAL_IN에 대응)
+            R recv = null;
+            if (kind != CallKind.STATIC && targets.stream().anyMatch(t -> !t.isStatic)) {
+                if (kind == CallKind.THIS || kind == CallKind.SUPER) recv = thisVal >= 0 ? R.of(thisVal, cls.fqn) : R.EMPTY;
+                else if (recvVal != null) recv = recvVal;
+                else if (recvField != null) {
+                    int k = recvField.lastIndexOf('.');
+                    recv = fieldLoad(recvField.substring(0, k), recvField.substring(k + 1), rtype, obj, 0);
+                } else recv = obj == null ? R.EMPTY : expr(obj);
+            }
+            return projectCall(inv, name, args, kind, rtype, recvField, targets, conf, recv);
+        }
         if (rtype != null && idx.isProject(rtype)) {
             R acc = accessor(rtype, name, args, inv);
             if (acc != null) return acc;
@@ -1109,8 +1131,13 @@ final class MethodLowering {
     }
 
     private R projectCall(Node inv, String name, List<Node> args, CallKind kind, String rtype, String recvField,
-                          List<MethodInfo> targets, int conf) {
+                          List<MethodInfo> targets, int conf, R recv) {
         List<Integer> ain = new ArrayList<>();
+        if (recv != null) {
+            int ri = newVal(NodeKind.ACTUAL_IN, name + "(·)[this]", inv.getChildByFieldName("object").orElse(inv));
+            dus(recv.vals, ri, 0);
+            ain.add(ri);
+        }
         for (int i = 0; i < args.size(); i++) {
             Node a = args.get(i);
             R av = a.getType().equals("lambda_expression") ? lambda(a, List.of()) : expr(a);
@@ -1120,7 +1147,7 @@ final class MethodLowering {
         }
         int ao = newVal(NodeKind.ACTUAL_OUT, name + "() 결과", inv);
         CallSite.Builder cs = CallSite.newBuilder().addAllActualIn(ain).setActualOut(ao).setMethodName(name)
-                .setReceiverType(rtype == null ? "" : rtype).setCallKind(kind).setConf(Confidence.forNumber(conf))
+                .setReceiverType(rtype == null ? "" : rtype).setCallKind(kind).setConf(Confidence.forNumber(conf)).setHasReceiver(recv != null)
                 .setSpan(span(inv));
         for (MethodInfo t : targets) cs.addCandidateTargets(t.signature);
         if (recvField != null) cs.setReceiverField(fieldExt(recvField));
@@ -1181,7 +1208,7 @@ final class MethodLowering {
             List<MethodInfo> ctors = idx.findMethods(type, "<init>", args.size());
             if (!ctors.isEmpty() || !args.isEmpty()) {
                 R r = projectCall(n, "<init>", args, CallKind.CONSTRUCTOR, type, null, ctors,
-                        ctors.isEmpty() ? Confidence.HEURISTIC_VALUE : Confidence.EXACT_VALUE);
+                        ctors.isEmpty() ? Confidence.HEURISTIC_VALUE : Confidence.EXACT_VALUE, null);
                 return new R(r.vals, type);
             }
             return new R(List.of(), type);
@@ -1204,7 +1231,7 @@ final class MethodLowering {
             return;
         }
         projectCall(s, "<init>", args, which.equals("super") ? CallKind.SUPER : CallKind.THIS, target, null,
-                idx.findMethods(target, "<init>", args.size()), Confidence.EXACT_VALUE);
+                idx.findMethods(target, "<init>", args.size()), Confidence.EXACT_VALUE, null);
     }
 
     /** Tier C 내장 SQL: SQL 문자열을 해석할 수 있으면 합성 메서드를 만들고 직접 호출로 연결합니다. */
@@ -1221,7 +1248,7 @@ final class MethodLowering {
         int k = j.bindFrom() < 0 ? 0 : cnt[0];
         int line = inv.getStartPoint().row() + 1;
         String sname = info.name + "$sql" + (++sqlCount) + "@L" + line;
-        String sig = cls.fqn + "#" + sname;
+        String sig = cls.fqn + "#" + sname + "(" + String.join(",", java.util.Collections.nCopies(k, "java.lang.Object")) + ")";
         List<String> params = new ArrayList<>();
         List<BindSlot> slots = new ArrayList<>();
         for (int i = 0; i < k; i++) {
@@ -1385,7 +1412,7 @@ final class MethodLowering {
 
     private MethodIR emit(Map<Block, List<Cd>> cd) {
         MethodIR.Builder m = MethodIR.newBuilder().setSignature(info.signature).setClassName(cls.fqn).setName(info.name)
-                .addAllParamTypes(info.paramTypes).addAllParamNames(info.paramNames).setReturnType(info.returnType)
+                .addAllParamTypes(info.paramTypes).addAllParamNames(info.paramNames).setReturnType(info.returnType).setHasThis(thisVal >= 0)
                 .setIsAbstract(info.isAbstract).setIsStatic(info.isStatic).setSpan(span(decl));
         int[] map = new int[vals.size()];
         int n = 0;

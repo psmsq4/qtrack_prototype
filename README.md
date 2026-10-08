@@ -71,7 +71,7 @@ $Q query flow /grade score --index … --control --paths
 | `rules` | Rule Pack 엔진(YAML + tree-sitter query, 식 언어) + 기본 팩 `rules/{spring,mybatis,jdbc}` |
 | `extract-java` | 2패스 추출: 선언 색인 → CST→SSA lowering(Braun), CFG, **PREDICATE/CONTROL(후지배 트리)**, 라이브러리 요약 |
 | `extract-mybatis` | StAX, `<include>/<if>/<choose>/<foreach>/<where>/<set>/<trim>/<bind>` 전개, 상한 축약 |
-| `extract-sql` | JSqlParser 분석: 범위·이름 해석, `*` 치환, 바인드↔컬럼(절), COL_DERIVES, 합성 메서드 |
+| `extract-sql` | JSqlParser 분석: 범위·이름 해석, `*` 치환, 바인드↔컬럼(절), COL_DERIVES, 합성 메서드(빌더에서 Mapper 메서드에 합침) |
 | `catalog` | 카탈로그(DDL/CSV/QT_META_POPULATOR) + 데이터소스 매핑 |
 | `graph-build` | ID 배정(D-01), LOCAL_FLOW/CONTROL_FLOW, 링크(DI·Mapper), **SCC 고정점 요약 + 플래그 마스크**, CSR(D-02), 스냅샷 |
 | `graph-store` | off-heap CSR·노드 표·문자열 사전·정렬 색인·L2 chunk (FFM `MemorySegment` + mmap) |
@@ -85,8 +85,8 @@ $Q query flow /grade score --index … --control --paths
 ```
 index/<snapshot>/
   meta.json strings.dict files.tsv
-  nodes/   kind.u8 owner.i32 name.i32 span.i64 chunk.i32
-  methods/ start.i32 end.i32 sig.i32 flags.u8 fo.i32 file.i32 fin.{off,tgt}
+  nodes/   kind.u8 owner.i32 name.i32 span.i64(fileId<<32 | 바이트 오프셋) chunk.i32
+  methods/ start.i32 end.i32 sig.i32 flags.u8 fo.i32 file.i32 fin.{off,tgt}   (chunk 배치: FORMAL_IN(this,…) → FORMAL_OUT → ACTUAL → BIND → STORE/LOAD)
   iface/   <KIND>.{fwd,rev}.{off,tgt,conf[,clause,flags,masks,derive]}   (LOCAL_FLOW ARG_IN RET_OUT SUMMARY STORE LOAD BIND_TO MAPS_TO COL_DERIVES CONTROL_FLOW)
            summary.tbl
   l2/      chunks.idx chunks.bin    (메서드별 LOCAL·PREDICATE + DEF_USE/CONTROL 정·역 CSR, label·caseVal)

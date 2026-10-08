@@ -13,8 +13,8 @@ queries:
     options: { control: true }
     expect:
       - "메서드|com.k.GradeController#update(java.lang.String,int)"
-      - "SQL|com.k.ScoreMapper#update"
-      - "SQL 바인드|com.k.ScoreMapper#update #{grade}"
+      - "SQL|com.k.ScoreMapper#update(java.lang.String,java.lang.String)"
+      - "SQL 바인드|com.k.ScoreMapper#update(java.lang.String,java.lang.String) #{grade}"
       - "컬럼|MEMBER.GRADE"
 
   - id: q2-kind-with-control
@@ -23,8 +23,8 @@ queries:
     options: { control: true }
     expect:
       - "메서드|com.k.GradeController#level(java.lang.String,int,boolean)"
-      - "SQL|com.k.ScoreMapper#update"
-      - "SQL 바인드|com.k.ScoreMapper#update #{grade}"
+      - "SQL|com.k.ScoreMapper#update(java.lang.String,java.lang.String)"
+      - "SQL 바인드|com.k.ScoreMapper#update(java.lang.String,java.lang.String) #{grade}"
       - "컬럼|MEMBER.GRADE"
 
 control:
@@ -36,6 +36,9 @@ control:
       - "score > 90 -FALSE-> score > 70"
       - "score > 70 -TRUE-> grade#2"
       - "score > 70 -FALSE-> grade#3"
+      # 수신 객체(mapper 필드 읽기)도 이 분기에서 새로 정의되는 값 (설계서 5.2: 수신 객체 = ACTUAL_IN[0])
+      - "id == null -FALSE-> load GradeController.mapper"
+      - "id == null -FALSE-> update(·)[this]"
       - "id == null -FALSE-> update(·)[0]"
       - "id == null -FALSE-> update(·)[1]"
       - "id == null -FALSE-> update() 결과"

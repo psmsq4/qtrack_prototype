@@ -6,11 +6,11 @@ queries:
     kind: column
     args: [CUSTOMER.CUST_GRADE]
     expect:
-      - "SQL|com.s.GradeMapper#byGrade"
-      - "SQL|com.s.GradeMapper#byGradeView"
-      - "SQL|etl.sql#stmt2@L7"
-      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
-      - "SQL 바인드|com.s.GradeMapper#byGradeView #{g}"
+      - "SQL|com.s.GradeMapper#byGrade(java.lang.String)"
+      - "SQL|com.s.GradeMapper#byGradeView(java.lang.String)"
+      - "SQL|etl.sql#stmt2@L7()"
+      - "SQL 바인드|com.s.GradeMapper#byGrade(java.lang.String) #{grade}"
+      - "SQL 바인드|com.s.GradeMapper#byGradeView(java.lang.String) #{g}"
       - "컬럼|VIP_CUST.GRADE"
       - "컬럼|VIP_REPORT.GRADE"
       - "메서드|com.s.GradeController#byGrade(java.lang.String)"
@@ -24,8 +24,8 @@ queries:
     kind: column
     args: [ORDERS.AMOUNT]
     expect:
-      - "SQL|etl.sql#stmt1@L1"
-      - "SQL|etl.sql#stmt4@L14"
+      - "SQL|etl.sql#stmt1@L1()"
+      - "SQL|etl.sql#stmt4@L14()"
       - "컬럼|ORDER_HIST.AMOUNT"
       - "컬럼|CUST_SUMMARY.TOTAL_AMT"
 
@@ -34,6 +34,6 @@ queries:
     args: [GET /grades, grade]
     expect:
       - "메서드|com.s.GradeController#byGrade(java.lang.String)"
-      - "SQL|com.s.GradeMapper#byGrade"
-      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
+      - "SQL|com.s.GradeMapper#byGrade(java.lang.String)"
+      - "SQL 바인드|com.s.GradeMapper#byGrade(java.lang.String) #{grade}"
       - "컬럼|CUSTOMER.CUST_GRADE"

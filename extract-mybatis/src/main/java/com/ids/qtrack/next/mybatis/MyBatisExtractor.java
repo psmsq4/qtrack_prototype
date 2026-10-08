@@ -42,7 +42,8 @@ public final class MyBatisExtractor {
 
     /** mapper XML이면 문장 목록, 아니면 빈 목록. */
     public List<PreparedSql> extract(Path file, int fileId) throws Exception {
-        XNode root = XNode.parse(file);
+        XNode.Doc doc = XNode.parse(file);
+        XNode root = doc.root;
         if (root == null || !root.name.equals("mapper")) return List.of();
         String ns = root.attr("namespace") == null ? file.getFileName().toString() : root.attr("namespace");
         Map<String, XNode> fragments = new HashMap<>();
@@ -60,7 +61,7 @@ public final class MyBatisExtractor {
         List<PreparedSql> out = new ArrayList<>();
         for (XNode st : root.elements()) {
             if (!STATEMENTS.contains(st.name) || st.attr("id") == null) continue;
-            out.add(statement(ns, st, fragments, resultMaps, fileId));
+            out.add(statement(ns, st, fragments, resultMaps, fileId, doc));
         }
         return out;
     }
@@ -74,11 +75,11 @@ public final class MyBatisExtractor {
     }
 
     private PreparedSql statement(String ns, XNode st, Map<String, XNode> fragments, Map<String, ResultMap> resultMaps,
-                                  int fileId) {
+                                  int fileId, XNode.Doc doc) {
         String id = st.attr("id");
         XNode t = st.copy();
         inlineIncludes(t, fragments, Map.of(), 0);
-        Numbering num = new Numbering(fileId);
+        Numbering num = new Numbering(fileId, doc);
         num.walk(t, new HashMap<>(), new HashMap<>());
         boolean dynamic = isDynamic(t);
         long count = count(t.children);
@@ -100,9 +101,10 @@ public final class MyBatisExtractor {
         }
         Set<String> params = new LinkedHashSet<>();
         for (BindSlot s : num.slots) params.add(s.root());
-        Span span = Span.newBuilder().setFileId(fileId).setStart(Math.max(0, st.offset)).setEnd(Math.max(0, st.offset))
-                .setLine(st.line).build();
-        return new PreparedSql(ns + "#" + id, ns, id, span, st.name, st.attr("parameterType"), resultType, props,
+        int stEnd = doc.raw.indexOf("</" + st.name, st.rawStart);
+        Span span = Span.newBuilder().setFileId(fileId).setStart(doc.byteOffset(st.rawStart))
+                .setEnd(doc.byteOffset(stEnd < 0 ? st.rawStart : stEnd)).setLine(doc.line(st.rawStart)).build();
+        return new PreparedSql(ns + "#" + id + "(" + (st.attr("parameterType") == null ? "" : st.attr("parameterType")) + ")", ns, id, span, st.name, st.attr("parameterType"), resultType, props,
                 new ArrayList<>(params), num.slots, new ArrayList<>(variants), dynamic, capped);
     }
 
@@ -114,7 +116,7 @@ public final class MyBatisExtractor {
             if (o instanceof XNode.Text t && !props.isEmpty()) {
                 String s = t.text();
                 for (var e : props.entrySet()) s = s.replace("${" + e.getKey() + "}", e.getValue());
-                n.children.set(i, new XNode.Text(s, t.offset(), t.line()));
+                n.children.set(i, new XNode.Text(s, t.rawStart()));
             }
             if (!(o instanceof XNode x)) continue;
             if (x.name.equals("include")) {
@@ -141,10 +143,12 @@ public final class MyBatisExtractor {
 
     private static final class Numbering {
         final int fileId;
+        final XNode.Doc doc;
         final List<BindSlot> slots = new ArrayList<>();
 
-        Numbering(int fileId) {
+        Numbering(int fileId, XNode.Doc doc) {
             this.fileId = fileId;
+            this.doc = doc;
         }
 
         void walk(XNode n, Map<String, String> items, Map<String, String> binds) {
@@ -152,7 +156,7 @@ public final class MyBatisExtractor {
             for (int i = 0; i < n.children.size(); i++) {
                 Object o = n.children.get(i);
                 if (o instanceof XNode.Text t) {
-                    n.children.set(i, new XNode.Text(substitute(t, items, localBinds), t.offset(), t.line()));
+                    n.children.set(i, new XNode.Text(substitute(t, items, localBinds), t.rawStart()));
                 } else if (o instanceof XNode x) {
                     if (x.name.equals("bind") && x.attr("name") != null) {
                         localBinds.put(x.attr("name"), firstIdent(x.attr("value")));
@@ -173,6 +177,7 @@ public final class MyBatisExtractor {
         private String substitute(XNode.Text t, Map<String, String> items, Map<String, String> binds) {
             Matcher m = PARAM.matcher(t.text());
             StringBuilder sb = new StringBuilder();
+            int cursor = t.rawStart();
             while (m.find()) {
                 boolean dollar = m.group(1).equals("$");
                 String expr = m.group(2).split(",")[0].trim();
@@ -186,9 +191,12 @@ public final class MyBatisExtractor {
                     root = binds.get(first) == null ? "_parameter" : binds.get(first);
                 } else root = first;
                 int slot = slots.size();
-                int line = Math.max(1, t.line() - (int) t.text().substring(m.start()).chars().filter(c -> c == '\n').count());
-                Span span = Span.newBuilder().setFileId(fileId).setStart(Math.max(0, t.offset()))
-                        .setEnd(Math.max(0, t.offset())).setLine(line).build();
+                // 원문에서 같은 #{…} 표기를 찾아 정확한 위치로 (include로 복사된 조각도 원래 위치)
+                int at = doc.raw.indexOf(m.group(0), cursor);
+                if (at < 0) at = cursor;
+                else cursor = at + m.group(0).length();
+                Span span = Span.newBuilder().setFileId(fileId).setStart(doc.byteOffset(at))
+                        .setEnd(doc.byteOffset(at + m.group(0).length())).setLine(doc.line(at)).build();
                 slots.add(new BindSlot(slot, expr, root, rest, span, dollar));
                 m.appendReplacement(sb, Matcher.quoteReplacement(dollar ? "QT_DOLLAR_" + slot : SqlText.bindName(slot)));
             }

@@ -68,12 +68,12 @@ class ControlDependenceTest {
                   else                 { w = k();  }
                 }""", "m");
         assertEquals(set(
-                "a > 10 -TRUE-> f(·)[0]", "a > 10 -TRUE-> f() 결과", "a > 10 -TRUE-> x#1",
+                "a > 10 -TRUE-> f(·)[0]", "a > 10 -TRUE-> f(·)[this]", "a > 10 -TRUE-> f() 결과", "a > 10 -TRUE-> x#1",
                 "a > 10 -FALSE-> b == 1",
-                "b == 1 -TRUE-> g(·)[0]", "b == 1 -TRUE-> g() 결과", "b == 1 -TRUE-> y#1",
+                "b == 1 -TRUE-> g(·)[0]", "b == 1 -TRUE-> g(·)[this]", "b == 1 -TRUE-> g() 결과", "b == 1 -TRUE-> y#1",
                 "b == 1 -FALSE-> c != null",
-                "c != null -TRUE-> h(·)[0]", "c != null -TRUE-> h() 결과", "c != null -TRUE-> z#1",
-                "c != null -FALSE-> k() 결과", "c != null -FALSE-> w#1"), control(m));
+                "c != null -TRUE-> h(·)[0]", "c != null -TRUE-> h(·)[this]", "c != null -TRUE-> h() 결과", "c != null -TRUE-> z#1",
+                "c != null -FALSE-> k() 결과", "c != null -FALSE-> k(·)[this]", "c != null -FALSE-> w#1"), control(m));
         assertEquals(true, defUse(m).containsAll(set("a -> a > 10", "b -> b == 1", "c -> c != null")));
     }
 
@@ -85,7 +85,7 @@ class ControlDependenceTest {
                   if (id == null) return;
                   update(id);
                 }""", "m");
-        assertEquals(set("id == null -FALSE-> update(·)[0]", "id == null -FALSE-> update() 결과"), control(m));
+        assertEquals(set("id == null -FALSE-> update(·)[0]", "id == null -FALSE-> update(·)[this]", "id == null -FALSE-> update() 결과"), control(m));
     }
 
     /** 중첩 if: 바로 위 조건에만 연결. */
@@ -97,7 +97,7 @@ class ControlDependenceTest {
                   if (a > 0) { if (b > 0) { x = f(b); } }
                 }""", "m");
         assertEquals(set("a > 0 -TRUE-> b > 0",
-                "b > 0 -TRUE-> f(·)[0]", "b > 0 -TRUE-> f() 결과", "b > 0 -TRUE-> x#2"), control(m));
+                "b > 0 -TRUE-> f(·)[0]", "b > 0 -TRUE-> f(·)[this]", "b > 0 -TRUE-> f() 결과", "b > 0 -TRUE-> x#2"), control(m));
     }
 
     /** switch: CASE/DEFAULT, fall-through 블록은 여러 case에 종속. */
@@ -113,10 +113,10 @@ class ControlDependenceTest {
                   }
                 }""", "m");
         assertEquals(set(
-                "switch (t) -CASE 1-> f(·)[0]", "switch (t) -CASE 1-> f() 결과", "switch (t) -CASE 1-> a#1",
-                "switch (t) -CASE 1-> g(·)[0]", "switch (t) -CASE 1-> g() 결과", "switch (t) -CASE 1-> b#1",
-                "switch (t) -CASE 2-> g(·)[0]", "switch (t) -CASE 2-> g() 결과", "switch (t) -CASE 2-> b#1",
-                "switch (t) -DEFAULT-> k() 결과", "switch (t) -DEFAULT-> c#1"), control(m));
+                "switch (t) -CASE 1-> f(·)[0]", "switch (t) -CASE 1-> f(·)[this]", "switch (t) -CASE 1-> f() 결과", "switch (t) -CASE 1-> a#1",
+                "switch (t) -CASE 1-> g(·)[0]", "switch (t) -CASE 1-> g(·)[this]", "switch (t) -CASE 1-> g() 결과", "switch (t) -CASE 1-> b#1",
+                "switch (t) -CASE 2-> g(·)[0]", "switch (t) -CASE 2-> g(·)[this]", "switch (t) -CASE 2-> g() 결과", "switch (t) -CASE 2-> b#1",
+                "switch (t) -DEFAULT-> k() 결과", "switch (t) -DEFAULT-> k(·)[this]", "switch (t) -DEFAULT-> c#1"), control(m));
     }
 
     /** 반복 조건은 본문과 자기 자신을 제어 (P ─TRUE→ P). */
@@ -126,7 +126,7 @@ class ControlDependenceTest {
                 void m(int i, int n) {
                   while (i < n) { i = inc(i); }
                 }""", "m");
-        assertEquals(set("i < n -TRUE-> i < n", "i < n -TRUE-> inc(·)[0]", "i < n -TRUE-> inc() 결과",
+        assertEquals(set("i < n -TRUE-> i < n", "i < n -TRUE-> inc(·)[0]", "i < n -TRUE-> inc(·)[this]", "i < n -TRUE-> inc() 결과",
                 "i < n -TRUE-> i#2"), control(m));
     }
 
@@ -145,7 +145,7 @@ class ControlDependenceTest {
                 "for (s : items) -TRUE-> s#1", "for (s : items) -TRUE-> s == null",
                 "s == null -TRUE-> for (s : items)",
                 "s == null -FALSE-> isEmpty() 결과", "s == null -FALSE-> s.isEmpty()",
-                "s.isEmpty() -FALSE-> save(·)[0]", "s.isEmpty() -FALSE-> save() 결과",
+                "s.isEmpty() -FALSE-> save(·)[0]", "s.isEmpty() -FALSE-> save(·)[this]", "s.isEmpty() -FALSE-> save() 결과",
                 "s.isEmpty() -FALSE-> for (s : items)"), control(m));
     }
 
@@ -158,9 +158,9 @@ class ControlDependenceTest {
                   if (a > 0 && b > 0) { t = f(a); } else { e = g(b); }
                 }""", "m");
         assertEquals(set("a > 0 -TRUE-> b > 0",
-                "b > 0 -TRUE-> f(·)[0]", "b > 0 -TRUE-> f() 결과", "b > 0 -TRUE-> t#1",
-                "a > 0 -FALSE-> g(·)[0]", "a > 0 -FALSE-> g() 결과", "a > 0 -FALSE-> e#1",
-                "b > 0 -FALSE-> g(·)[0]", "b > 0 -FALSE-> g() 결과", "b > 0 -FALSE-> e#1"), control(m));
+                "b > 0 -TRUE-> f(·)[0]", "b > 0 -TRUE-> f(·)[this]", "b > 0 -TRUE-> f() 결과", "b > 0 -TRUE-> t#1",
+                "a > 0 -FALSE-> g(·)[0]", "a > 0 -FALSE-> g(·)[this]", "a > 0 -FALSE-> g() 결과", "a > 0 -FALSE-> e#1",
+                "b > 0 -FALSE-> g(·)[0]", "b > 0 -FALSE-> g(·)[this]", "b > 0 -FALSE-> g() 결과", "b > 0 -FALSE-> e#1"), control(m));
     }
 
     /** 삼항 연산자: if와 같고 결과는 φ (φ는 종속되지 않음). */
@@ -171,8 +171,8 @@ class ControlDependenceTest {
                   int r = a > 0 ? f(a) : g(a);
                   return r;
                 }""", "m");
-        assertEquals(set("a > 0 -TRUE-> f(·)[0]", "a > 0 -TRUE-> f() 결과",
-                "a > 0 -FALSE-> g(·)[0]", "a > 0 -FALSE-> g() 결과"), control(m));
+        assertEquals(set("a > 0 -TRUE-> f(·)[0]", "a > 0 -TRUE-> f(·)[this]", "a > 0 -TRUE-> f() 결과",
+                "a > 0 -FALSE-> g(·)[0]", "a > 0 -FALSE-> g(·)[this]", "a > 0 -FALSE-> g() 결과"), control(m));
         assertEquals(true, defUse(m).containsAll(set("f() 결과 -> ?: 결과", "g() 결과 -> ?: 결과", "?: 결과 -> r#1", "r#1 -> 반환")));
     }
 
@@ -184,7 +184,7 @@ class ControlDependenceTest {
                   int x, y;
                   try { x = f(a); } catch (RuntimeException e) { y = g(a); }
                 }""", "m");
-        assertEquals(set("EXC(try#1) -EXCEPTION-> e#1", "EXC(try#1) -EXCEPTION-> g(·)[0]",
+        assertEquals(set("EXC(try#1) -EXCEPTION-> e#1", "EXC(try#1) -EXCEPTION-> g(·)[0]", "EXC(try#1) -EXCEPTION-> g(·)[this]",
                 "EXC(try#1) -EXCEPTION-> g() 결과", "EXC(try#1) -EXCEPTION-> y#1"), control(m));
     }
 
@@ -209,7 +209,8 @@ class ControlDependenceTest {
                   String id = custId.trim();
                   return find(id);
                 }""", "list");
-        assertEquals(set("custId -> trim() 결과", "trim() 결과 -> id#1", "id#1 -> find(·)[0]", "find() 결과 -> 반환"),
+        assertEquals(set("custId -> trim() 결과", "trim() 결과 -> id#1", "id#1 -> find(·)[0]", "find() 결과 -> 반환",
+                        "this -> find(·)[this]"),
                 defUse(m));
         assertEquals(set(), control(m));
     }

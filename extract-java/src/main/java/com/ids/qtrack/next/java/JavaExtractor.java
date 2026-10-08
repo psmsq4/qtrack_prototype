@@ -279,7 +279,7 @@ public final class JavaExtractor {
         List<String> params = paramNames.size() > 1 ? paramNames : new ArrayList<>(roots);
         String ptype = mi.paramTypes.size() == 1 ? mi.paramTypes.getFirst() : null;
         String rtype = mi.returnType;
-        return new PreparedSql(ci.fqn + "#" + mi.name + "(sql)", ci.fqn, mi.name, sp, sf.type(), ptype,
+        return new PreparedSql(mi.signature, ci.fqn, mi.name, sp, sf.type(), ptype,
                 index.isProject(rtype) ? rtype : null, Map.of(), params, slots, List.of(sb.toString()), false, false);
     }
 
@@ -289,12 +289,16 @@ public final class JavaExtractor {
         MethodIR.Builder b = MethodIR.newBuilder().setSignature(mi.signature).setClassName(ci.fqn).setName(mi.name)
                 .addAllParamTypes(mi.paramTypes).addAllParamNames(mi.paramNames).setReturnType(mi.returnType)
                 .setIsAbstract(true).setSpan(span(m, fileId));
-        for (int i = 0; i < mi.paramNames.size(); i++) {
+        List<String> names = new ArrayList<>();
+        boolean hasThis = !mi.isStatic && !mi.isConstructor;
+        if (hasThis) names.add("this");
+        names.addAll(mi.paramNames);
+        for (int i = 0; i < names.size(); i++) {
             b.addNodes(com.ids.qtrack.next.ir.Node.newBuilder().setLocalId(i)
-                    .setKind(com.ids.qtrack.next.ir.NodeKind.FORMAL_IN).setName(mi.paramNames.get(i)));
+                    .setKind(com.ids.qtrack.next.ir.NodeKind.FORMAL_IN).setName(names.get(i)).setSpan(span(m, fileId)));
             b.addFormalIn(i);
         }
-        return b.build();
+        return b.setHasThis(hasThis).build();
     }
 
     static Span span(Node n, int fileId) {

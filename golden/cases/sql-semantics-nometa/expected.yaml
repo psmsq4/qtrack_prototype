@@ -7,8 +7,8 @@ queries:
     args: [GET /grades, grade]
     expect:
       - "메서드|com.s.GradeController#byGrade(java.lang.String)"
-      - "SQL|com.s.GradeMapper#byGrade"
-      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
+      - "SQL|com.s.GradeMapper#byGrade(java.lang.String)"
+      - "SQL 바인드|com.s.GradeMapper#byGrade(java.lang.String) #{grade}"
       - "컬럼|CUSTOMER.CUST_GRADE"
       - "컬럼|ORDERS.CUST_GRADE"
 
@@ -18,15 +18,15 @@ queries:
     options: { minConf: RESOLVED }
     expect:
       - "메서드|com.s.GradeController#byGrade(java.lang.String)"
-      - "SQL|com.s.GradeMapper#byGrade"
-      - "SQL 바인드|com.s.GradeMapper#byGrade #{grade}"
+      - "SQL|com.s.GradeMapper#byGrade(java.lang.String)"
+      - "SQL 바인드|com.s.GradeMapper#byGrade(java.lang.String) #{grade}"
 
   - id: q1-amount-no-column-list
     kind: column
     args: [ORDERS.AMOUNT]
     expect:
-      - "SQL|etl.sql#stmt1@L1"
-      - "SQL|etl.sql#stmt4@L14"
+      - "SQL|etl.sql#stmt1@L1()"
+      - "SQL|etl.sql#stmt4@L14()"
       - "컬럼|ORDER_HIST.*"
       - "컬럼|CUST_SUMMARY.TOTAL_AMT"
 
@@ -36,6 +36,6 @@ queries:
     args: [CUSTOMER.CUST_GRADE]
     mode: contains
     expect:
-      - "SQL|com.s.GradeMapper#byGradeView"
+      - "SQL|com.s.GradeMapper#byGradeView(java.lang.String)"
       - "컬럼|VIP_CUST.GRADE"
       - "컬럼|VIP_REPORT.GRADE"

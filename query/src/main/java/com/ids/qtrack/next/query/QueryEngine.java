@@ -6,6 +6,7 @@ import com.ids.qtrack.next.store.L2Chunk;
 import com.ids.qtrack.next.store.OffHeap;
 import com.ids.qtrack.next.store.Snapshot;
 import com.ids.qtrack.next.store.SortedIndex;
+import com.ids.qtrack.next.store.SourceLines;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayDeque;
@@ -45,9 +46,11 @@ public final class QueryEngine {
     /** 방문 상태 flags의 내부 비트: 이 노드에서 더 나아가지 않음. */
     private static final int TERMINAL = 4;
     private final Snapshot g;
+    private final SourceLines lines;
 
     public QueryEngine(Snapshot g) {
         this.g = g;
+        this.lines = new SourceLines(g);
     }
 
     static int bit(int kind) {
@@ -483,12 +486,12 @@ public final class QueryEngine {
     // ───────────────────────────── 유틸 ─────────────────────────────
 
     private String file(long span) {
-        int f = (int) (span >>> 32);
-        return span < 0 || f < 0 ? "" : g.file(f);
+        return lines.file(span);
     }
 
-    private static int line(long span) {
-        return span < 0 ? 0 : (int) (span & 0xffffffffL);
+    /** span의 바이트 오프셋 → 줄 번호 (표시용). */
+    private int line(long span) {
+        return lines.line(span);
     }
 
     private static void put(QueryResult r, Options o) {

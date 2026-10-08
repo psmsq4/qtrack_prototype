@@ -9,8 +9,8 @@ queries:
     args: [GET /orders/search, custId]
     expect:
       - "메서드|com.d.OrderQueryController#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
-      - "SQL|com.d.OrderQueryMapper#search"
-      - "SQL 바인드|com.d.OrderQueryMapper#search #{custId}"
+      - "SQL|com.d.OrderQueryMapper#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
+      - "SQL 바인드|com.d.OrderQueryMapper#search(java.lang.String,java.lang.String,java.util.List,java.lang.String) #{custId}"
       - "컬럼|ORDERS.CUST_ID"
 
   - id: q2-foreach-ids
@@ -18,8 +18,8 @@ queries:
     args: [GET /orders/search, ids]
     expect:
       - "메서드|com.d.OrderQueryController#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
-      - "SQL|com.d.OrderQueryMapper#search"
-      - "SQL 바인드|com.d.OrderQueryMapper#search #{oid}"
+      - "SQL|com.d.OrderQueryMapper#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
+      - "SQL 바인드|com.d.OrderQueryMapper#search(java.lang.String,java.lang.String,java.util.List,java.lang.String) #{oid}"
       - "컬럼|ORDERS.ORDER_ID"
 
   # ${…}: 바인드가 아니라 SQL 텍스트 오염 → UNKNOWN (HEURISTIC)
@@ -29,8 +29,8 @@ queries:
     tags: [unknown]
     expect:
       - "메서드|com.d.OrderQueryController#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
-      - "SQL|com.d.OrderQueryMapper#search"
-      - "UNKNOWN|com.d.OrderQueryMapper#search ${sortColumn}"
+      - "SQL|com.d.OrderQueryMapper#search(java.lang.String,java.lang.String,java.util.List,java.lang.String)"
+      - "UNKNOWN|com.d.OrderQueryMapper#search(java.lang.String,java.lang.String,java.util.List,java.lang.String) ${sortColumn}"
       - "Endpoint|GET /orders/search"
 
   - id: q1-connect-by
@@ -38,8 +38,8 @@ queries:
     args: [CATEGORY.CAT_ID]
     tags: [oracle]
     expect:
-      - "SQL|com.d.OrderQueryMapper#tree"
-      - "SQL 바인드|com.d.OrderQueryMapper#tree #{root}"
+      - "SQL|com.d.OrderQueryMapper#tree(java.lang.String)"
+      - "SQL 바인드|com.d.OrderQueryMapper#tree(java.lang.String) #{root}"
       - "메서드|com.d.OrderQueryController#tree(java.lang.String)"
       - "Endpoint 입력|com.d.OrderQueryController#tree(java.lang.String) (root)"
       - "Endpoint|GET /orders/tree"
@@ -50,8 +50,8 @@ queries:
     tags: [oracle]
     expect:
       - "메서드|com.d.OrderQueryController#pivot(java.lang.String)"
-      - "SQL|com.d.OrderQueryMapper#pivot"
-      - "SQL 바인드|com.d.OrderQueryMapper#pivot #{custId}"
+      - "SQL|com.d.OrderQueryMapper#pivot(java.lang.String)"
+      - "SQL 바인드|com.d.OrderQueryMapper#pivot(java.lang.String) #{custId}"
       - "컬럼|ORDERS.CUST_ID"
 
   # 전개 상한 초과: 신뢰도 HEURISTIC → minConf=RESOLVED 이면 바인드에서 멈춘다
@@ -60,8 +60,8 @@ queries:
     args: [GET /orders/huge, a]
     expect:
       - "메서드|com.d.OrderQueryController#huge(java.lang.String,java.lang.String)"
-      - "SQL|com.d.OrderQueryMapper#huge"
-      - "SQL 바인드|com.d.OrderQueryMapper#huge #{a}"
+      - "SQL|com.d.OrderQueryMapper#huge(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String)"
+      - "SQL 바인드|com.d.OrderQueryMapper#huge(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String) #{a}"
       - "컬럼|ORDERS.COL_A"
   - id: q2-capped-min-resolved
     kind: flow
@@ -69,4 +69,4 @@ queries:
     options: { minConf: RESOLVED }
     expect:
       - "메서드|com.d.OrderQueryController#huge(java.lang.String,java.lang.String)"
-      - "SQL|com.d.OrderQueryMapper#huge"
+      - "SQL|com.d.OrderQueryMapper#huge(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String)"

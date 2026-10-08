@@ -14,10 +14,10 @@ queries:
       - "메서드|com.f.Customer#setCustGrade(java.lang.String)"
       - "필드|com.f.Customer.custGrade"
       - "메서드|com.f.Customer#getCustGrade()"
-      - "SQL 바인드|com.f.CustomerMapper#updateGrade #{custGrade}"
+      - "SQL 바인드|com.f.CustomerMapper#updateGrade(com.f.Customer) #{custGrade}"
       - "컬럼|CUSTOMER.CUST_GRADE"
       # 컬럼에 저장된 값은 그 컬럼을 읽는 SQL로 이어진다 (SET → SELECT)
-      - "SQL|com.f.CustomerMapper#findGrade(sql)"
+      - "SQL|com.f.CustomerMapper#findGrade(java.lang.String)"
       - "메서드|com.f.CustomerController#find(java.lang.String)"
       - "Endpoint|GET /customers/{id}"
 
@@ -25,9 +25,9 @@ queries:
     kind: column
     args: [CUSTOMER.CUST_GRADE]
     expect:
-      - "SQL|com.f.CustomerMapper#updateGrade"
-      - "SQL|com.f.CustomerMapper#findGrade(sql)"
-      - "SQL 바인드|com.f.CustomerMapper#updateGrade #{custGrade}"
+      - "SQL|com.f.CustomerMapper#updateGrade(com.f.Customer)"
+      - "SQL|com.f.CustomerMapper#findGrade(java.lang.String)"
+      - "SQL 바인드|com.f.CustomerMapper#updateGrade(com.f.Customer) #{custGrade}"
       - "필드|com.f.Customer.custGrade"
       - "메서드|com.f.Customer#setCustGrade(java.lang.String)"
       - "메서드|com.f.CustomerServiceImpl#changeGrade(java.lang.String,java.lang.String)"
@@ -42,8 +42,8 @@ queries:
     kind: column
     args: [CUSTOMER_OLD.GRADE]
     expect:
-      - "SQL|com.f.LegacyCustomerService#changeGrade$sql1@L13"
-      - "SQL 바인드|com.f.LegacyCustomerService#changeGrade$sql1@L13 #{?1}"
+      - "SQL|com.f.LegacyCustomerService#changeGrade$sql1@L13(java.lang.Object,java.lang.Object)"
+      - "SQL 바인드|com.f.LegacyCustomerService#changeGrade$sql1@L13(java.lang.Object,java.lang.Object) #{?1}"
       - "메서드|com.f.LegacyCustomerService#changeGrade(java.lang.String,java.lang.String)"
 
   # Q3: 인터페이스 메서드 시그니처 변경 → DI로 연결된 호출자

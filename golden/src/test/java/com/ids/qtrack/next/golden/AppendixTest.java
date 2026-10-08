@@ -33,8 +33,8 @@ class AppendixTest {
 
     static String method(Snapshot g, int m) {
         String sig = g.methodSig(m);
-        if ((g.methodFlags(m) & 1) != 0) return sig.substring(sig.indexOf('#') + 1) + "(xml)";
-        return sig.substring(sig.indexOf('#') + 1, sig.indexOf('('));
+        String name = sig.substring(sig.indexOf('#') + 1, sig.indexOf('('));
+        return (g.methodFlags(m) & 1) != 0 ? name + "(xml)" : name;
     }
 
     static String node(Snapshot g, int v) {
@@ -43,7 +43,14 @@ class AppendixTest {
 
     static final Set<String> CHUNKS = Set.of("list", "find", "select(xml)");
 
+    /** 부록 A는 this 규칙(설계서 5.2) 이전 표이므로 this·수신 객체 노드는 대조에서 빼고 chunkLayoutRule에서 따로 검사. */
+    static boolean receiverNode(Snapshot g, int v) {
+        String n = g.name(v);
+        return n.equals("this") || n.endsWith("[this]") || g.kind(v) == Kinds.FIELD_LOAD;
+    }
+
     static boolean inAppendix(Snapshot g, int v) {
+        if (receiverNode(g, v)) return false;
         return g.owner(v) < 0 ? g.name(v).equals("ORDERS.CUST_ID") : CHUNKS.contains(method(g, g.owner(v)));
     }
 
@@ -77,7 +84,7 @@ class AppendixTest {
                     "FORMAL_IN list:custId", "LOCAL list:trim() 결과", "LOCAL list:id#1", "ACTUAL_IN list:find(·)[0]",
                     "ACTUAL_OUT list:find() 결과", "FORMAL_OUT list:반환",
                     "FORMAL_IN find:id", "ACTUAL_IN find:select(·)[0]", "ACTUAL_OUT find:select() 결과", "FORMAL_OUT find:반환",
-                    "FORMAL_IN select(xml):id", "BIND select(xml):#{id}", "FORMAL_OUT select(xml):결과",
+                    "FORMAL_IN select(xml):id", "BIND select(xml):#{id}", "FORMAL_OUT select(xml):반환",
                     "COLUMN ORDERS.CUST_ID")), nodes);
             assertEquals(14, nodes.size());
         }
@@ -88,9 +95,9 @@ class AppendixTest {
         try (Snapshot g = Snapshot.open(snap)) {
             assertEquals(Set.of("list:custId -> list:find(·)[0]", "list:find() 결과 -> list:반환",
                     "find:id -> find:select(·)[0]", "find:select() 결과 -> find:반환",
-                    "select(xml):#{id} -> select(xml):결과 implicit"), edges(g, Kinds.LOCAL_FLOW));
+                    "select(xml):#{id} -> select(xml):반환 implicit"), edges(g, Kinds.LOCAL_FLOW));
             assertEquals(Set.of("list:find(·)[0] -> find:id", "find:select(·)[0] -> select(xml):id"), edges(g, Kinds.ARG_IN));
-            assertEquals(Set.of("find:반환 -> list:find() 결과", "select(xml):결과 -> find:select() 결과"), edges(g, Kinds.RET_OUT));
+            assertEquals(Set.of("find:반환 -> list:find() 결과", "select(xml):반환 -> find:select() 결과"), edges(g, Kinds.RET_OUT));
             // D-06: 두 SUMMARY 모두 implicit만으로 도달 (masks bit1 = 조합 {implicit})
             assertEquals(Set.of("list:find(·)[0] -> list:find() 결과 masks=2", "find:select(·)[0] -> find:select() 결과 masks=2"),
                     edges(g, Kinds.SUMMARY));
@@ -104,7 +111,41 @@ class AppendixTest {
             for (int v = 0; v < c.nodes; v++)
                 for (int i = c.defUseFwd.begin(v); i < c.defUseFwd.end(v); i++)
                     du.add(g.strings.get(c.name(v)) + " -> " + g.strings.get(c.name(c.defUseFwd.target(i))));
-            assertEquals(Set.of("custId -> trim() 결과", "trim() 결과 -> id#1", "id#1 -> find(·)[0]", "find() 결과 -> 반환"), du);
+            assertEquals(Set.of("custId -> trim() 결과", "trim() 결과 -> id#1", "id#1 -> find(·)[0]", "find() 결과 -> 반환",
+                    "this -> find(·)[this]"), du);
+        }
+    }
+
+    /**
+     * 설계서 5.2 chunk 배치 규칙: FORMAL_IN(this, 파라미터 순) → FORMAL_OUT → 호출 지점별 ACTUAL_IN·ACTUAL_OUT → BIND
+     * → STORE/LOAD → 그 밖의 인터페이스 노드. 파라미터 i = chunk 시작 + i, 메서드 하나에 chunk 하나.
+     */
+    @Test
+    void chunkLayoutRule() {
+        try (Snapshot g = Snapshot.open(snap)) {
+            Set<String> sigs = new java.util.HashSet<>();
+            for (int m = 0; m < g.methodCount(); m++) {
+                assertTrue(sigs.add(g.methodSig(m)), "chunk 중복 " + g.methodSig(m));
+                int[] fins = g.methodFormalIns(m);
+                for (int i = 0; i < fins.length; i++) assertEquals(g.methodStart(m) + i, fins[i], g.methodSig(m));
+                List<Integer> rank = new java.util.ArrayList<>();
+                for (int v = g.methodStart(m); v < g.methodEnd(m); v++) {
+                    int k = g.kind(v);
+                    rank.add(switch (k) {
+                        case Kinds.FORMAL_IN -> 0;
+                        case Kinds.FORMAL_OUT -> 1;
+                        case Kinds.ACTUAL_IN, Kinds.ACTUAL_OUT -> 2;
+                        case Kinds.BIND -> 3;
+                        case Kinds.FIELD_STORE, Kinds.FIELD_LOAD -> 4;
+                        default -> 5;
+                    });
+                }
+                for (int i = 1; i < rank.size(); i++) assertTrue(rank.get(i - 1) <= rank.get(i), g.methodSig(m) + " 배치 " + rank);
+                String sig = g.methodSig(m);
+                if (sig.startsWith("com.x.OrderService#")) assertEquals("this", g.name(fins[0]));   // 인스턴스 메서드: this가 0번
+            }
+            // MyBatis XML 문장은 인터페이스 메서드와 합쳐져 한 chunk (정규화 시그니처)
+            assertEquals(1, g.methodIdx.lookup("com.x.OrderMapper#select(java.lang.String)").length);
         }
     }
 

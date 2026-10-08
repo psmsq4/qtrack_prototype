@@ -9,6 +9,6 @@ queries:
     args: [POST /notes, text]
     expect:
       - "메서드|com.b.BrokenController#save(java.lang.String)"
-      - "SQL|com.b.NoteMapper#insert"
-      - "SQL 바인드|com.b.NoteMapper#insert #{text}"
+      - "SQL|com.b.NoteMapper#insert(java.lang.String)"
+      - "SQL 바인드|com.b.NoteMapper#insert(java.lang.String) #{text}"
       - "컬럼|NOTE.BODY"

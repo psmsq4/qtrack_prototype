@@ -148,30 +148,38 @@ public final class Indexer {
         List<PreparedSql> out = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
         boolean q = false;
-        int line = 1, startLine = 1, n = 0;
+        int line = 1, startLine = 1, startIdx = 0, n = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c == '\'') q = !q;
             if (c == '\n') line++;
             if (c == ';' && !q) {
-                add(out, cur.toString(), p, fileId, startLine, ++n);
+                add(out, cur.toString(), p, fileId, startLine, byteOffset(text, startIdx), ++n);
                 cur.setLength(0);
                 startLine = line;
+                startIdx = i + 1;
             } else {
-                if (cur.toString().isBlank() && !Character.isWhitespace(c)) startLine = line;
+                if (cur.toString().isBlank() && !Character.isWhitespace(c)) {
+                    startLine = line;
+                    startIdx = i;
+                }
                 cur.append(c);
             }
         }
-        add(out, cur.toString(), p, fileId, startLine, ++n);
+        add(out, cur.toString(), p, fileId, startLine, byteOffset(text, startIdx), ++n);
         return out;
     }
 
-    private static void add(List<PreparedSql> out, String sql, Path p, int fileId, int line, int n) {
+    private static int byteOffset(String text, int charIdx) {
+        return text.substring(0, Math.min(charIdx, text.length())).getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private static void add(List<PreparedSql> out, String sql, Path p, int fileId, int line, int offset, int n) {
         String s = sql.strip();
         if (s.isEmpty() || s.lines().allMatch(l -> l.isBlank() || l.strip().startsWith("--"))) return;
         int[] cnt = new int[1];
         String numbered = SqlText.numberQuestionMarks(s, 0, cnt);
-        Span span = Span.newBuilder().setFileId(fileId).setLine(line).build();
+        Span span = Span.newBuilder().setFileId(fileId).setStart(offset).setEnd(offset).setLine(line).build();
         List<String> params = new ArrayList<>();
         List<BindSlot> slots = new ArrayList<>();
         for (int i = 0; i < cnt[0]; i++) {
@@ -180,7 +188,7 @@ public final class Indexer {
         }
         String name = "stmt" + n + "@L" + line;
         String cls = p.getFileName().toString();
-        out.add(new PreparedSql(cls + "#" + name, cls, name, span, "", null, null, Map.of(), params, slots,
+        out.add(new PreparedSql(cls + "#" + name + "()", cls, name, span, "", null, null, Map.of(), params, slots,
                 List.of(numbered), false, false));
     }
 }

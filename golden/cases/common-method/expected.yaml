@@ -7,8 +7,8 @@ queries:
     expect:
       - "메서드|com.c.AController#a(java.lang.String)"
       - "메서드|com.c.Util#normalize(java.lang.String)"
-      - "SQL|com.c.CommonMapper#findA"
-      - "SQL 바인드|com.c.CommonMapper#findA #{key}"
+      - "SQL|com.c.CommonMapper#findA(java.lang.String)"
+      - "SQL 바인드|com.c.CommonMapper#findA(java.lang.String) #{key}"
       - "컬럼|TA.A_KEY"
 
   - id: q2-b-does-not-leak-to-a
@@ -17,16 +17,16 @@ queries:
     expect:
       - "메서드|com.c.BController#b(java.lang.String)"
       - "메서드|com.c.Util#normalize(java.lang.String)"
-      - "SQL|com.c.CommonMapper#findB"
-      - "SQL 바인드|com.c.CommonMapper#findB #{key}"
+      - "SQL|com.c.CommonMapper#findB(java.lang.String)"
+      - "SQL 바인드|com.c.CommonMapper#findB(java.lang.String) #{key}"
       - "컬럼|TB.B_KEY"
 
   - id: q1-ta-only-reaches-a
     kind: column
     args: [TA.A_KEY]
     expect:
-      - "SQL|com.c.CommonMapper#findA"
-      - "SQL 바인드|com.c.CommonMapper#findA #{key}"
+      - "SQL|com.c.CommonMapper#findA(java.lang.String)"
+      - "SQL 바인드|com.c.CommonMapper#findA(java.lang.String) #{key}"
       - "메서드|com.c.AController#a(java.lang.String)"
       - "메서드|com.c.Util#normalize(java.lang.String)"
       - "Endpoint 입력|com.c.AController#a(java.lang.String) (x)"

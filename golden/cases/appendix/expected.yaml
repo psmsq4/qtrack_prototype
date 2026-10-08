@@ -6,8 +6,8 @@ queries:
     kind: column
     args: [ORDERS.CUST_ID]
     expect:
-      - "SQL|com.x.OrderMapper#select"
-      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+      - "SQL|com.x.OrderMapper#select(java.lang.String)"
+      - "SQL 바인드|com.x.OrderMapper#select(java.lang.String) #{id}"
       - "메서드|com.x.OrderService#find(java.lang.String)"
       - "메서드|com.x.OrderService#list(java.lang.String)"
       - "메서드|com.x.OrderController#orders(java.lang.String)"
@@ -19,8 +19,8 @@ queries:
     args: [ORDERS.CUST_ID]
     options: { minConf: EXACT }
     expect:
-      - "SQL|com.x.OrderMapper#select"
-      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+      - "SQL|com.x.OrderMapper#select(java.lang.String)"
+      - "SQL 바인드|com.x.OrderMapper#select(java.lang.String) #{id}"
 
   # s18: --implicit 를 끄면 custId → list 반환 경로는 나오지 않고 #{id} → ORDERS.CUST_ID 경로는 나온다 (D-06)
   - id: q2-custid
@@ -30,8 +30,8 @@ queries:
       - "메서드|com.x.OrderController#orders(java.lang.String)"
       - "메서드|com.x.OrderService#list(java.lang.String)"
       - "메서드|com.x.OrderService#find(java.lang.String)"
-      - "SQL|com.x.OrderMapper#select"
-      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+      - "SQL|com.x.OrderMapper#select(java.lang.String)"
+      - "SQL 바인드|com.x.OrderMapper#select(java.lang.String) #{id}"
       - "컬럼|ORDERS.CUST_ID"
 
   - id: q2-custid-implicit
@@ -43,8 +43,8 @@ queries:
       - "메서드|com.x.OrderController#orders(java.lang.String)"
       - "메서드|com.x.OrderService#list(java.lang.String)"
       - "메서드|com.x.OrderService#find(java.lang.String)"
-      - "SQL|com.x.OrderMapper#select"
-      - "SQL 바인드|com.x.OrderMapper#select #{id}"
+      - "SQL|com.x.OrderMapper#select(java.lang.String)"
+      - "SQL 바인드|com.x.OrderMapper#select(java.lang.String) #{id}"
       - "컬럼|ORDERS.CUST_ID"
       - "Endpoint|GET /api/orders"
 

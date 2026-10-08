@@ -9,8 +9,8 @@ queries:
       - "메서드|com.r.RecController#walk(java.lang.String,int)"
       - "메서드|com.r.RecController#even(java.lang.String,int)"
       - "메서드|com.r.RecController#odd(java.lang.String,int)"
-      - "SQL|com.r.RecMapper#save"
-      - "SQL 바인드|com.r.RecMapper#save #{value}"
+      - "SQL|com.r.RecMapper#save(java.lang.String)"
+      - "SQL 바인드|com.r.RecMapper#save(java.lang.String) #{value}"
       - "컬럼|REC_LOG.VAL"
 
   - id: q2-depth-data-only
@@ -30,8 +30,8 @@ queries:
       - "메서드|com.r.RecController#walk(java.lang.String,int)"
       - "메서드|com.r.RecController#even(java.lang.String,int)"
       - "메서드|com.r.RecController#odd(java.lang.String,int)"
-      - "SQL|com.r.RecMapper#save"
-      - "SQL 바인드|com.r.RecMapper#save #{value}"
+      - "SQL|com.r.RecMapper#save(java.lang.String)"
+      - "SQL 바인드|com.r.RecMapper#save(java.lang.String) #{value}"
       - "컬럼|REC_LOG.VAL"
 
   # 재귀가 있어도 파라미터가 반환으로 흐르지 않으면 요약도 없어야 한다 (오탐 방지)
@@ -47,7 +47,7 @@ queries:
     args: [REC_LOG.VAL]
     mode: contains
     expect:
-      - "SQL|com.r.RecMapper#save"
+      - "SQL|com.r.RecMapper#save(java.lang.String)"
       - "메서드|com.r.RecController#api(java.lang.String,int)"
       - "메서드|com.r.RecController#walk(java.lang.String,int)"
       - "메서드|com.r.RecController#even(java.lang.String,int)"

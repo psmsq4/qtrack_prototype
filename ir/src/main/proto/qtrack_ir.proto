@@ -81,6 +81,7 @@ message CallSite {
   CallKind call_kind = 7;
   Span span = 8;
   uint32 receiver_field = 9;      // 수신 객체가 필드면 externals 인덱스+1 (DI 규칙 해석용)
+  bool has_receiver = 10;         // (추가) actual_in[0]이 수신 객체 (대상의 this FORMAL_IN에 대응, 설계서 5.2 배치 규칙)
 }
 
 message SqlMeta {                 // (추가) 합성 메서드의 SQL 정보
@@ -117,6 +118,7 @@ message MethodIR {
   SqlMeta sql = 15;
   repeated uint32 formal_in = 16; // 파라미터 순서의 FORMAL_IN local_id
   uint32 formal_out = 17;         // FORMAL_OUT local_id + 1 (0 = 없음)
+  bool has_this = 18;             // (추가) formal_in[0]이 this (인스턴스 메서드). param_types/param_names에는 this가 없음
 }
 
 message FieldDecl {
