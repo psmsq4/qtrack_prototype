@@ -200,6 +200,30 @@ class ControlDependenceTest {
         assertEquals(true, defUse(m).containsAll(set("f() 결과 -> return@L12", "return@L12 -> 반환")));
     }
 
+    /** φ는 합류를 만든 제어문의 위치와 종류를 이름·위치로 갖는다 (메서드 선언 위치로 대체하지 않음). */
+    @Test
+    void phiPositionIsMergingStatement() {
+        MethodIR m = method("""
+                void m(int s) {
+                  String g;
+                  if (s > 90) { g = "A"; }
+                  else if (s > 70) { g = "B"; }
+                  else { g = "C"; }
+                  update(g);
+                }""", "m");
+        assertEquals(true, defUse(m).containsAll(set(
+                "g#1 -> g#4 (φ: L13 if 합류)", "g#5 (φ: L14 if 합류) -> g#4 (φ: L13 if 합류)",
+                "g#2 -> g#5 (φ: L14 if 합류)", "g#3 -> g#5 (φ: L14 if 합류)",
+                "g#4 (φ: L13 if 합류) -> update(·)[0]")), defUse(m).toString());
+        for (var n : m.getNodesList())
+            if (n.getName().equals("g#4 (φ: L13 if 합류)")) assertEquals(13, n.getSpan().getLine());
+        MethodIR w = method("""
+                void w(int i, int n) {
+                  while (i < n) { i = inc(i); }
+                }""", "w");
+        assertEquals(true, defUse(w).contains("i#1 (φ: L12 while 반복) -> i < n"), defUse(w).toString());
+    }
+
     /** 설계서 부록 A의 list() 메서드: DEF_USE 0→1→2→3, 4→5. */
     @Test
     void appendixDefUse() {

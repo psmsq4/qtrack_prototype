@@ -64,9 +64,35 @@ final class MethodLowering {
         boolean sealed, terminated;
         final Map<String, Integer> defs = new HashMap<>();
         final Map<String, Integer> incomplete = new LinkedHashMap<>();
+        /** 이 블록을 만든 제어문 (φ의 위치·이름에 씀). 없으면 null. */
+        Node origin;
+        String originKind;
 
         Block(int id) {
             this.id = id;
+        }
+    }
+
+    /** 지금 lowering 중인 제어문 (안쪽이 위). newBlock()이 블록의 출처로 기록합니다. */
+    private record Origin(Node node, String kind) {}
+
+    private final Deque<Origin> origins = new ArrayDeque<>();
+
+    private void withinS(Node n, String kind, Runnable f) {
+        origins.push(new Origin(n, kind));
+        try {
+            f.run();
+        } finally {
+            origins.pop();
+        }
+    }
+
+    private R withinE(Node n, String kind, java.util.function.Supplier<R> f) {
+        origins.push(new Origin(n, kind));
+        try {
+            return f.get();
+        } finally {
+            origins.pop();
         }
     }
 
@@ -218,6 +244,10 @@ final class MethodLowering {
 
     private Block newBlock() {
         Block b = new Block(blocks.size());
+        if (!origins.isEmpty()) {
+            b.origin = origins.peek().node();
+            b.originKind = origins.peek().kind();
+        }
         blocks.add(b);
         return b;
     }
@@ -295,12 +325,14 @@ final class MethodLowering {
     private int newPhi(String var, Block b) {
         Block save = cur;
         cur = b;
-        int v = newVal(NodeKind.LOCAL, nextVersion(var) + " (φ)", null);
+        // φ는 합류를 만든 제어문의 위치를 갖습니다 (예: "grade#4 (φ: L15 if 합류)")
+        String label = b.origin == null ? " (φ)"
+                : " (φ: L" + (b.origin.getStartPoint().row() + 1) + " " + b.originKind + ")";
+        int v = newVal(NodeKind.LOCAL, nextVersion(var) + label, b.origin);
         cur = save;
         Val pv = vals.get(v);
         pv.phi = true;
         pv.var = var;
-        pv.line = 0;
         return v;
     }
 
@@ -372,6 +404,16 @@ final class MethodLowering {
                 .setLine(n.getStartPoint().row() + 1).build();
     }
 
+    /**
+     * 메서드 선언 위치: 시작은 메서드 이름(어노테이션 줄이 아니라 시그니처 줄), 끝은 선언 끝.
+     * 위치가 없는 노드의 대체 위치로도 쓰입니다.
+     */
+    static Span declSpan(Node decl, int fileId) {
+        Node name = decl.getChildByFieldName("name").orElse(decl);
+        return Span.newBuilder().setFileId(fileId).setStart(name.getStartByte()).setEnd(decl.getEndByte())
+                .setLine(name.getStartPoint().row() + 1).build();
+    }
+
     private static String text(Node n) {
         return JavaIndex.text(n);
     }
@@ -405,12 +447,12 @@ final class MethodLowering {
             case "expression_statement" -> {
                 for (Node c : s.getNamedChildren()) expr(c);
             }
-            case "if_statement" -> ifStmt(s);
-            case "while_statement" -> whileStmt(s, label);
-            case "for_statement" -> forStmt(s, label);
-            case "enhanced_for_statement" -> forEachStmt(s, label);
-            case "do_statement" -> doStmt(s, label);
-            case "switch_expression" -> switchExpr(s, false, label);
+            case "if_statement" -> withinS(s, "if 합류", () -> ifStmt(s));
+            case "while_statement" -> withinS(s, "while 반복", () -> whileStmt(s, label));
+            case "for_statement" -> withinS(s, "for 반복", () -> forStmt(s, label));
+            case "enhanced_for_statement" -> withinS(s, "for 반복", () -> forEachStmt(s, label));
+            case "do_statement" -> withinS(s, "do 반복", () -> doStmt(s, label));
+            case "switch_expression" -> withinE(s, "switch 합류", () -> switchExpr(s, false, label));
             case "return_statement" -> returnStmt(s);
             case "break_statement" -> breakStmt(s);
             case "continue_statement" -> continueStmt(s);
@@ -420,7 +462,7 @@ final class MethodLowering {
                 jump(cur, exit);
                 cur = deadBlock();
             }
-            case "try_statement", "try_with_resources_statement" -> tryStmt(s);
+            case "try_statement", "try_with_resources_statement" -> withinS(s, "try 합류", () -> tryStmt(s));
             case "labeled_statement" -> {
                 List<Node> ch = s.getNamedChildren();
                 pendingLabel = text(ch.getFirst());
@@ -780,7 +822,7 @@ final class MethodLowering {
             }
             case "binary_expression" -> {
                 String op = n.getChildByFieldName("operator").map(MethodLowering::text).orElse("");
-                if (op.equals("&&") || op.equals("||")) return shortCircuitValue(n);
+                if (op.equals("&&") || op.equals("||")) return withinE(n, op + " 합류", () -> shortCircuitValue(n));
                 R l = expr(n.getChildByFieldName("left").orElse(null));
                 R r = expr(n.getChildByFieldName("right").orElse(null));
                 String t = op.equals("+") && ("java.lang.String".equals(l.type) || "java.lang.String".equals(r.type))
@@ -799,7 +841,7 @@ final class MethodLowering {
                 return expr(target);
             }
             case "ternary_expression" -> {
-                return ternary(n);
+                return withinE(n, "?: 합류", () -> ternary(n));
             }
             case "cast_expression" -> {
                 R v = expr(n.getChildByFieldName("value").orElse(null));
@@ -817,7 +859,7 @@ final class MethodLowering {
                 return lambda(n, List.of());
             }
             case "switch_expression" -> {
-                return switchExpr(n, true, null);
+                return withinE(n, "switch 합류", () -> switchExpr(n, true, null));
             }
             case "array_access" -> {
                 return expr(n.getChildByFieldName("array").orElse(null)).plus(expr(n.getChildByFieldName("index").orElse(null)));
@@ -1012,6 +1054,7 @@ final class MethodLowering {
         Node body = n.getChildByFieldName("body").orElse(null);
         if (body == null) return R.EMPTY;
         if (!body.getType().equals("block")) return expr(body);
+        origins.push(new Origin(n, "람다"));
         Block lexit = newBlock();
         JumpCtx l = new JumpCtx(null, lexit, null, false);
         l.results = new ArrayList<>();
@@ -1024,6 +1067,7 @@ final class MethodLowering {
         jump(cur, lexit);
         seal(lexit);
         cur = lexit;
+        origins.pop();
         return new R(l.results, null);
     }
 
@@ -1413,7 +1457,7 @@ final class MethodLowering {
     private MethodIR emit(Map<Block, List<Cd>> cd) {
         MethodIR.Builder m = MethodIR.newBuilder().setSignature(info.signature).setClassName(cls.fqn).setName(info.name)
                 .addAllParamTypes(info.paramTypes).addAllParamNames(info.paramNames).setReturnType(info.returnType).setHasThis(thisVal >= 0)
-                .setIsAbstract(info.isAbstract).setIsStatic(info.isStatic).setSpan(span(decl));
+                .setIsAbstract(info.isAbstract).setIsStatic(info.isStatic).setSpan(declSpan(decl, fileId));
         int[] map = new int[vals.size()];
         int n = 0;
         for (Val v : vals) {

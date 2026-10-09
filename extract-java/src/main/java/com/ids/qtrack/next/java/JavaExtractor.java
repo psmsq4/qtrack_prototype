@@ -288,7 +288,7 @@ public final class JavaExtractor {
     private static MethodIR stub(MethodInfo mi, ClassInfo ci, int fileId, Node m) {
         MethodIR.Builder b = MethodIR.newBuilder().setSignature(mi.signature).setClassName(ci.fqn).setName(mi.name)
                 .addAllParamTypes(mi.paramTypes).addAllParamNames(mi.paramNames).setReturnType(mi.returnType)
-                .setIsAbstract(true).setSpan(span(m, fileId));
+                .setIsAbstract(true).setSpan(MethodLowering.declSpan(m, fileId));
         List<String> names = new ArrayList<>();
         boolean hasThis = !mi.isStatic && !mi.isConstructor;
         if (hasThis) names.add("this");
